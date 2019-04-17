@@ -10,10 +10,9 @@ Created: 17/05/19
 
 import torch
 from torch import nn
-from torchvision import transforms
 from torchvision.models import vgg16
 
-from image_handler import load_image_as_tensor
+from image_handler import load_image_as_tensor, transform_256
 
 
 class TruncatedVgg16(torch.nn.Module):
@@ -59,17 +58,15 @@ class LossNetwork:
         Calculate the style loss and content loss of an input image compared to a target style image and a
          target content image.
         """
-        # Don't need to use gradients as not doing back prop.
-        with torch.no_grad():
-            # Forward pass each image tensor and extract outputs
-            predicted_outputs = self.model(transformed_tensor)
-            style_target_outputs = self.model(style_tensor)
-            content_target_outputs = self.model(content_tensor)
+        # Forward pass each image tensor and extract outputs
+        predicted_outputs = self.model(transformed_tensor)
+        style_target_outputs = self.model(style_tensor)
+        content_target_outputs = self.model(content_tensor)
 
-            # Compute and return style loss and content loss
-            style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-            content_loss = self._content_loss(predicted_outputs, content_target_outputs)
-            return style_loss, content_loss
+        # Compute and return style loss and content loss
+        style_loss = self._style_loss(predicted_outputs, style_target_outputs)
+        content_loss = self._content_loss(predicted_outputs, content_target_outputs)
+        return style_loss, content_loss
 
     @staticmethod
     def _style_loss(predicted_outputs, target_outputs):
@@ -120,19 +117,13 @@ if __name__ == '__main__':
     """
     Runs some simple tests to ensure everything is working
     """
-    # Consistent transform to 256 x 256 tensor
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()
-    ])
-
     # Load style image tensor
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
-    style_tensor = load_image_as_tensor(style_path, transform=transform)
+    style_tensor = load_image_as_tensor(style_path, transform=transform_256)
 
     # Load content image tensor
     content_path = '../data/images/content/Landscape.jpeg'
-    content_tensor = load_image_as_tensor(content_path, transform=transform)
+    content_tensor = load_image_as_tensor(content_path, transform=transform_256)
 
     # Style loss should be zero since it's comparing to itself
     print('Testing style tensor match')
