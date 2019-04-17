@@ -3,6 +3,9 @@ Loss network implementation.
 
 Uses a pre-trained network (VGG-16 trained on ImageNet) to evaluate the loss of a transformed image with reference
 style and content images.
+
+Author: Joseph Early (je5g15@soton.ac.uk)
+Created: 17/05/19
 """
 
 import torch
@@ -25,11 +28,12 @@ class TruncatedVgg16(torch.nn.Module):
         # relu2_2 (8) for content
         # relu1_2 (3), relu2_2 (8), relu3_3 (15) and relu4_3 (22) for style
         self.target_layers = [3, 8, 15, 22]
-        features = list(vgg16(pretrained=True).features)[:self.target_layers[-1]]
+        features = list(vgg16(pretrained=True).features)[:self.target_layers[-1]+1]
         self.features = nn.ModuleList(features).eval()
 
     def forward(self, x):
         outputs = []
+        # Pass input through the network and grab the outputs of the layers we need.
         for layer_index, feature in enumerate(self.features):
             x = feature(x)
             if layer_index in self.target_layers:
@@ -38,6 +42,9 @@ class TruncatedVgg16(torch.nn.Module):
 
 
 class LossNetwork:
+    """
+    A wrapper around the truncated Vgg16 network provided computation of the style and content loss functions.
+    """
 
     def __init__(self):
         self.model = TruncatedVgg16()
@@ -48,38 +55,93 @@ class LossNetwork:
             p.require_grads = False
 
     def calculate_image_loss(self, transformed_tensor, style_tensor, content_tensor):
+        """
+        Calculate the style loss and content loss of an input image compared to a target style image and a
+         target content image.
+        """
         # Don't need to use gradients as not doing back prop.
         with torch.no_grad():
+            # Forward pass each image tensor and extract outputs
             predicted_outputs = self.model(transformed_tensor)
-            style_loss = self.style_loss(predicted_outputs, style_tensor)
-            content_loss = self.content_loss(predicted_outputs, content_tensor)
+            style_target_outputs = self.model(style_tensor)
+            content_target_outputs = self.model(content_tensor)
+
+            # Compute and return style loss and content loss
+            style_loss = self._style_loss(predicted_outputs, style_target_outputs)
+            content_loss = self._content_loss(predicted_outputs, content_target_outputs)
             return style_loss, content_loss
 
-    def style_loss(self, predicted_outputs, target_tensor):
-        target_outputs = self.model(target_tensor)
-        return 0
+    @staticmethod
+    def _style_loss(predicted_outputs, target_outputs):
+        """
+        Calculate the style loss between a set of predicted outputs and a set of target style outputs.
+        """
 
-    def content_loss(self, predicted_outputs, target_tensor):
-        target_outputs = self.model(target_tensor)
+        def gram_matrix(m):
+            # Reshape target outs from c x h x w to c x hw
+            shape = torch.tensor(m.shape)
+            m1 = m.reshape([shape[0], shape[1] * shape[2]])
+            # Calculate gram matrix
+            return m1.mm(m1.t()).div(shape.prod())
 
+        # Sum over all of the target outputs
+        loss = 0
+        for i in range(len(target_outputs)):
+            predicted_output = predicted_outputs[i]
+            target_output = target_outputs[i]
+
+            # Reduce from singleton 4D tensors to 3D tensors
+            predicted_output = predicted_output[0]
+            target_output = target_output[0]
+
+            # Calculate gram matrices
+            predicted_gram = gram_matrix(predicted_output)
+            target_gram = gram_matrix(target_output)
+
+            # Calculate Frobenius norm of gram matrices
+            dist = torch.norm(predicted_gram - target_gram, 'fro')
+            loss += dist.pow(2)
+
+        return loss
+
+    @staticmethod
+    def _content_loss(predicted_outputs, target_outputs):
+        """
+        Calculate the content loss between a set of predicted outputs and a set of target content outputs.
+        """
         # Use output from relu2_2 (second item in target outputs from TruncatedVgg16 model)
         shape = torch.tensor(target_outputs[1].shape)
-        dist = torch.norm(predicted_outputs[1] - target_outputs[1], 2)
-        dist = dist.pow(2)
-        loss = dist.div(shape.prod(0))
+        dist = torch.norm(predicted_outputs[1] - target_outputs[1])
+        loss = dist.pow(2).div(shape.prod())
         return loss
 
 
 if __name__ == '__main__':
+    """
+    Runs some simple tests to ensure everything is working
+    """
+    # Consistent transform to 256 x 256 tensor
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor()  # convert to tensor
+        transforms.ToTensor()
     ])
 
+    # Load style image tensor
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
     style_tensor = load_image_as_tensor(style_path, transform=transform)
 
+    # Load content image tensor
     content_path = '../data/images/content/Landscape.jpeg'
     content_tensor = load_image_as_tensor(content_path, transform=transform)
 
-    print(LossNetwork().calculate_image_loss(content_tensor, style_tensor, content_tensor))
+    # Style loss should be zero since it's comparing to itself
+    print('Testing style tensor match')
+    test_loss = LossNetwork().calculate_image_loss(style_tensor, style_tensor, content_tensor)
+    assert test_loss[0] == 0
+    assert test_loss[1] > 0
+
+    # Content loss should be zero since it's comparing to itself
+    print('Testing content tensor match')
+    test_loss = LossNetwork().calculate_image_loss(content_tensor, style_tensor, content_tensor)
+    assert test_loss[0] > 0
+    assert test_loss[1] == 0
