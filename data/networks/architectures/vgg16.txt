@@ -1,0 +1,43 @@
+Conv1_1 (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu1_1 (1): ReLU(inplace)
+
+Conv1_2 (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu1_2 (3): ReLU(inplace)
+Pool1   (4): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+
+Conv2_1 (5): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu2_1 (6): ReLU(inplace)
+
+Conv2_2 (7): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu2_2 (8): ReLU(inplace)
+Pool12  (9): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+
+Conv3_1 (10): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu3_1 (11): ReLU(inplace)
+
+Conv3_2 (12): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu3_2 (13): ReLU(inplace)
+
+Conv3_3 (14): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu3_3 (15): ReLU(inplace)
+Pool3   (16): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+
+Conv4_1 (17): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu4_1 (18): ReLU(inplace)
+
+Conv4_2 (19): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu4_2 (20): ReLU(inplace)
+
+Conv4_3 (21): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu4_3 (22): ReLU(inplace)
+Pool4   (23): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+
+Conv5_1 (24): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu5_1 (25): ReLU(inplace)
+
+Conv5_2 (26): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu5_1 (27): ReLU(inplace)
+
+Conv5_3 (28): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+Relu5_3 (29): ReLU(inplace)
+Pool5   (30): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
