@@ -46,10 +46,9 @@ class LossNetwork:
     """
 
     def __init__(self):
-        self.model = TruncatedVgg16()
-        # Lock model down
+        self.model = TruncatedVgg16().cuda()
+
         self.model.eval()
-        # Don't need to use gradients as not doing back prop.
         for p in self.model.parameters():
             p.require_grads = False
 
@@ -97,7 +96,8 @@ class LossNetwork:
 
             # Calculate Frobenius norm of gram matrices
             dist = torch.norm(predicted_gram - target_gram, 'fro')
-            loss += dist.pow(2)
+            shape = torch.tensor(predicted_gram.shape)
+            loss += dist.pow(2) / shape.prod()
 
         return loss
 
@@ -109,7 +109,7 @@ class LossNetwork:
         # Use output from relu2_2 (second item in target outputs from TruncatedVgg16 model)
         shape = torch.tensor(target_outputs[1].shape)
         dist = torch.norm(predicted_outputs[1] - target_outputs[1])
-        loss = dist.pow(2).div(shape.prod())
+        loss = dist.pow(2).sum().div(shape.prod())
         return loss
 
 

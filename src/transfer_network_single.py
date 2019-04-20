@@ -79,6 +79,7 @@ class TransferNetworkSingle(torch.nn.Module):
         self.relu = torch.nn.ReLU()
 
     def forward(self, x):
+
         # Apply downsampling
         y = self.relu(self.norm1(self.conv1(x)))
         y = self.relu(self.norm2(self.conv2(y)))
@@ -105,18 +106,18 @@ class TransferNetworkTrainerSingle:
         self.content_path = content_path
         self.save_directory = save_directory
         # Load images as tensors
-        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256)
-        self.content_tensor = load_image_as_tensor(self.content_path, transform=transform_256)
+        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).cuda()
+        self.content_tensor = load_image_as_tensor(self.content_path, transform=transform_256).cuda()
         # Load loss network
         self.loss_network = LossNetwork()
 
     def train(self):
-        model = TransferNetworkSingle()
+        model = TransferNetworkSingle().cuda()
         optimiser = optim.Adam(model.parameters())
         epochs = 100
 
         # Weight of style vs content TODO not sure if this value is correct
-        l1 = 1e10
+        l1 = 1.0
         output = None
 
         # Train
@@ -127,7 +128,7 @@ class TransferNetworkTrainerSingle:
             # Apply output to input (content) image
             output = self.content_tensor.add(output)
             # Calculate loss
-            content_loss, style_loss = self.loss_network.calculate_image_loss(output, self.content_tensor, self.style_tensor)
+            style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.content_tensor, self.style_tensor)
             loss = content_loss.add(style_loss.mul(l1))
             # Backprop (train) transfer network
             loss.backward()
