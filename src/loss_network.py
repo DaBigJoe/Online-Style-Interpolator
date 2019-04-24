@@ -46,7 +46,7 @@ class LossNetwork:
     """
 
     def __init__(self):
-        self.model = TruncatedVgg16().cuda()
+        self.model = TruncatedVgg16().to("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.model.eval()
         for p in self.model.parameters():
