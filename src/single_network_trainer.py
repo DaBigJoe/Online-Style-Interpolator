@@ -54,7 +54,10 @@ class LossNetwork:
         # Use output from relu2_2 (second item in target outputs from TruncatedVgg16 model)
         shape = torch.tensor(target_outputs[1].shape)
         dist = torch.norm(predicted_outputs[1] - target_outputs[1])
-        loss = dist.pow(2).sum().div(shape.prod())
+        dist = dist **2
+        dist = dist.sum()
+        dist = dist **0.5
+        loss = dist #dist.pow(2).sum().div(shape.prod())
         return loss
 
 
@@ -67,7 +70,7 @@ class LossNetwork:
             m = m.squeeze(0)
             # Reshape target outs from c x h x w to c x hw
             shape = torch.tensor(m.shape)
-            m1 = m.reshape([shape[0], shape[1] * shape[2]])
+            m1 = m.view([shape[0], shape[1] * shape[2]])
             # Calculate gram matrix
             return m1.mm(m1.t()).div(shape.prod())
 
@@ -88,7 +91,7 @@ class LossNetwork:
             # Calculate Frobenius norm of gram matrices
             dist = torch.norm(predicted_gram - target_gram, 'fro')
             shape = torch.tensor(predicted_gram.shape)
-            loss += dist.pow(2) / shape.prod()
+            loss += dist.pow(2)
 
         return loss
 
@@ -96,7 +99,7 @@ def loss_calculator(x, y):
     global loss_net
     original_tens, target_style_tens = y
 
-    new_tensor = x.add(x)
+    new_tensor = original_tens.add(x)
     new_tensor = torch.clamp(new_tensor, min=0, max=255)
 
     reg_loss = (
@@ -107,8 +110,8 @@ def loss_calculator(x, y):
     style_loss, content_loss = loss_net.calculate_image_loss(new_tensor, original_tens, target_style_tens)
 
     l1 = torch.tensor([1.0])
-    l2 = torch.tensor([1E4])
-    l3 = torch.tensor([1E-6])
+    l2 = torch.tensor([5.0])
+    l3 = torch.tensor([0.0])
 
     content_loss = content_loss.detach() * l1
     style_loss = style_loss.detach() * l2
@@ -116,6 +119,7 @@ def loss_calculator(x, y):
 
     loss = content_loss.add(style_loss.add(reg_loss))
     return loss.requires_grad_(True)
+
 
 class Dataset(data.Dataset):
   'Characterizes a dataset for PyTorch'
@@ -143,6 +147,7 @@ class Dataset(data.Dataset):
             _X[1] = X
             _X[2] = X
             X = _X
+        X = X * 255.0
 
         y = (X, self.target_style_tensor)
 

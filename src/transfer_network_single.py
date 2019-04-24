@@ -147,6 +147,5 @@ class TransferNetworkTrainerSingle:
 
 
 if __name__ == '__main__':
-    style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
     content_path = '../data/images/content/Landscape.jpeg'
     TransferNetworkTrainerSingle(style_path, content_path, '../data/images/produced/starry_night_landscape').train()
