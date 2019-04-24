@@ -18,6 +18,7 @@ import torchbearer
 from loss_network import TruncatedVgg16
 from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256
 from transfer_network_single import TransferNetworkSingle
+import torch.multiprocessing as mp
 
 class LossNetwork:
 
@@ -93,13 +94,28 @@ class LossNetwork:
 
 def loss_calculator(x, y):
     global loss_net
-
     original_tens, target_style_tens = y
-    style_loss, content_loss = loss_net.calculate_image_loss(x, original_tens, target_style_tens)
 
-    l1 = 1.0
-    loss = content_loss.add(style_loss.mul(l1))
-    return loss.clone().detach().requires_grad_(True)
+    new_tensor = x.add(x)
+    new_tensor = torch.clamp(new_tensor, min=0, max=255)
+
+    reg_loss = (
+            torch.sum(torch.abs(new_tensor[:, :, :, :-1] - new_tensor[:, :, :, 1:])) +
+            torch.sum(torch.abs(new_tensor[:, :, :-1, :] - new_tensor[:, :, 1:, :]))
+    )
+
+    style_loss, content_loss = loss_net.calculate_image_loss(new_tensor, original_tens, target_style_tens)
+
+    l1 = torch.tensor([1.0])
+    l2 = torch.tensor([1E4])
+    l3 = torch.tensor([1E-6])
+
+    content_loss = content_loss.detach() * l1
+    style_loss = style_loss.detach() * l2
+    reg_loss = reg_loss.detach() * l3
+
+    loss = content_loss.add(style_loss.add(reg_loss))
+    return loss.requires_grad_(True)
 
 class Dataset(data.Dataset):
   'Characterizes a dataset for PyTorch'
@@ -141,10 +157,10 @@ class SINGLE_TRAINER:
 
         self.model = TransferNetworkSingle()
 
-    def train(self):
         global loss_net
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        mp.set_start_method('spawn')
 
         target_style_tensor = loss_net.get_style(self.style_image)
         training_set = Dataset(self.training_dir, target_style_tensor)
@@ -152,22 +168,29 @@ class SINGLE_TRAINER:
         train_loader = DataLoader(training_set, batch_size=4, shuffle=True)
 
         loss_function = loss_calculator
-        optimiser = optim.Adam(self.model.parameters())
+        optimiser = optim.Adam(self.model.parameters(), lr=1E-3)
 
-        trial = torchbearer.Trial(self.model, optimiser, loss_function, metrics=[]).to(device)
-        trial.with_generators(train_loader)
+        self.trial = torchbearer.Trial(self.model, optimiser, loss_function, metrics=[]).to(device)
+        self.trial.with_generators(train_loader)
 
+    def train(self):
         print('Running Training')
-        trial.run(epochs=2)
+        self.trial.run(epochs=2)
         print('Finished Training')
 
-        results = trial.evaluate(data_key=torchbearer.TRAIN_DATA)
-        print(results)
-
+        print('Saving')
         torch.save(self.model.state_dict(), self.model_save_path)
+        print('Saved')
 
     def forward(self, img):
         return self.model(img).detach()
+
+    def evaluate(self):
+        print('Evaluating using training data')
+        results = self.trial.evaluate(data_key=torchbearer.TRAIN_DATA)
+        print(results)
+        print('Evaluated')
+
 
 training_images_dir = '../data/coco/'
 style_image_dir = '../data/images/style/Van_Gogh_Starry_Night.jpg'
@@ -180,3 +203,8 @@ st = SINGLE_TRAINER(training_images_dir, style_image_dir, model_save_path)
 
 print('STARTING TRAINING')
 st.train()
+
+print('STARTING EVALUATION')
+st.evaluate()
+
+print('ALL DONE')

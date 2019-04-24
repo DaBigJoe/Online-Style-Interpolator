@@ -11,9 +11,15 @@ test_image_path = '../data/images/content/Landscape.jpeg'
 
 model = TransferNetworkSingle()
 model.load_state_dict(torch.load(model_save_path))
+model.cuda()
 
-test_image = load_image_as_tensor(test_image_path, transform=transform_256)
-test_output = model(test_image)
+test_image = load_image_as_tensor(test_image_path, transform=transform_256).cuda()
 
-plot_image_tensor(test_image)
-plot_image_tensor(test_output.detach())
+test_output = model.forward(test_image)
+test_output = test_output.add(test_image)
+test_output = test_output.detach()
+
+print('Plotting')
+#plot_image_tensor(test_output.cpu())
+plot_image_tensor(test_image.cpu())
+print('Done')
