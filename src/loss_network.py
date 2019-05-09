@@ -47,10 +47,10 @@ class LossNetwork:
 
     def __init__(self):
         self.model = TruncatedVgg16().to("cuda:0" if torch.cuda.is_available() else "cpu")
-
         self.model.eval()
         for p in self.model.parameters():
             p.require_grads = False
+        self.mse_loss = torch.nn.MSELoss()
 
     def calculate_image_loss(self, transformed_tensor, style_tensor, content_tensor):
         """
@@ -67,8 +67,7 @@ class LossNetwork:
         content_loss = self._content_loss(predicted_outputs, content_target_outputs)
         return style_loss, content_loss
 
-    @staticmethod
-    def _style_loss(predicted_outputs, target_outputs):
+    def _style_loss(self, predicted_outputs, target_outputs):
         """
         Calculate the style loss between a set of predicted outputs and a set of target style outputs.
         """
@@ -95,22 +94,16 @@ class LossNetwork:
             target_gram = gram_matrix(target_output)
 
             # Calculate Frobenius norm of gram matrices
-            dist = torch.norm(predicted_gram - target_gram, 'fro')
-            shape = torch.tensor(predicted_gram.shape)
-            loss += dist.pow(2) / shape.prod()
+            loss += self.mse_loss(predicted_gram, target_gram)
 
         return loss
 
-    @staticmethod
-    def _content_loss(predicted_outputs, target_outputs):
+    def _content_loss(self, predicted_outputs, target_outputs):
         """
         Calculate the content loss between a set of predicted outputs and a set of target content outputs.
         """
-        # Use output from relu2_2 (second item in target outputs from TruncatedVgg16 model)
-        shape = torch.tensor(target_outputs[1].shape)
-        dist = torch.norm(predicted_outputs[1] - target_outputs[1])
-        loss = dist.pow(2).sum().div(shape.prod())
-        return loss
+        # Use output from relu3_3 (third item in target outputs from TruncatedVgg16 model)
+        return self.mse_loss(target_outputs[2], predicted_outputs[2])
 
 
 if __name__ == '__main__':

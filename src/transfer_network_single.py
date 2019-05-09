@@ -106,48 +106,50 @@ class TransferNetworkTrainerSingle:
         self.content_path = content_path
         self.save_directory = save_directory
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
         # Load images as tensors
         self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to(device)
         self.content_tensor = load_image_as_tensor(self.content_path, transform=transform_256).to(device)
+
         # Load loss network
         self.loss_network = LossNetwork()
 
     def train(self):
         model = TransferNetworkSingle().cuda()
-        optimiser = optim.Adam(model.parameters())
-        epochs = 100
+        optimiser = optim.Adam(model.parameters(), lr=1e-3)
+        epochs = 1000
 
-        # Weight of style vs content TODO not sure if this value is correct
-        l1 = 1.0
-        output = None
+        # Weight of style vs content
+        style_weight = 1e12
+        content_weight = 1e5
 
         # Train
         for epoch in range(epochs+1):
             optimiser.zero_grad()
             # Pass through transfer network
             output = model(self.content_tensor)
-            # Apply output to input (content) image
-            output = self.content_tensor.add(output)
             # Calculate loss
-            style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.content_tensor, self.style_tensor)
-            loss = content_loss.add(style_loss.mul(l1))
+            style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor, self.content_tensor)
+            style_loss = style_loss.mul(style_weight)
+            content_loss = content_loss.mul(content_weight)
+            loss = content_loss.add(style_loss)
             # Backprop (train) transfer network
             loss.backward()
             optimiser.step()
-            print("Epoch %d, loss %4.2f" % (epoch, loss))
+            print("Epoch %d, loss %4.2f, (style loss %4.5f, content loss %4.5f)" % (epoch, loss, style_loss, content_loss))
 
-        output = output.detach()
+        final_output = model(self.content_tensor)
         # Save image
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
         file_name = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S') + '.jpg'
         file_path = os.path.join(self.save_directory, file_name)
-        save_tensor_as_image(output, file_path)
+        save_tensor_as_image(final_output, file_path)
         # Show image (requires reload)
         plot_image_tensor(load_image_as_tensor(file_path))
 
 
 if __name__ == '__main__':
-    content_path = '../data/images/content/Landscape.jpeg'
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
+    content_path = '../data/images/content/Landscape.jpeg'
     TransferNetworkTrainerSingle(style_path, content_path, '../data/images/produced/starry_night_landscape').train()
