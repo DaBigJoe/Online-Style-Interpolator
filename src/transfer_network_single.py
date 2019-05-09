@@ -105,9 +105,10 @@ class TransferNetworkTrainerSingle:
         self.style_path = style_path
         self.content_path = content_path
         self.save_directory = save_directory
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         # Load images as tensors
-        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.content_tensor = load_image_as_tensor(self.content_path, transform=transform_256).to("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to(device)
+        self.content_tensor = load_image_as_tensor(self.content_path, transform=transform_256).to(device)
         # Load loss network
         self.loss_network = LossNetwork()
 
@@ -148,4 +149,5 @@ class TransferNetworkTrainerSingle:
 
 if __name__ == '__main__':
     content_path = '../data/images/content/Landscape.jpeg'
+    style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
     TransferNetworkTrainerSingle(style_path, content_path, '../data/images/produced/starry_night_landscape').train()

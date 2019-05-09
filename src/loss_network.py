@@ -27,7 +27,7 @@ class TruncatedVgg16(torch.nn.Module):
         # relu2_2 (8) for content
         # relu1_2 (3), relu2_2 (8), relu3_3 (15) and relu4_3 (22) for style
         self.target_layers = [3, 8, 15, 22]
-        features = list(vgg16(pretrained=True).features)[:self.target_layers[-1]+1]
+        features = list(vgg16(pretrained=True).features)[:self.target_layers[-1] + 1]
         self.features = nn.ModuleList(features).eval()
 
     def forward(self, x):

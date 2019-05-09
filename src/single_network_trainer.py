@@ -13,6 +13,7 @@ from torch.utils import data
 from torch.utils.data import DataLoader
 from torch import optim
 
+from tqdm import tqdm
 import torchbearer
 
 from loss_network import TruncatedVgg16
@@ -123,24 +124,38 @@ def loss_calculator(x, y):
 
 class Dataset(data.Dataset):
   'Characterizes a dataset for PyTorch'
+
   def __init__(self, dir, target_style_tensor):
-        self.dir = dir
-        self.items = listdir(dir)
+        self.data = []
+
+        items = listdir(dir)
+
+        ignore_runner = 0
+
+        # Variable step, only sample 1 in check_step images TODO remove for final
+        check_step = 100
+        print("Check interval is", check_step)
+
+        for _, path in enumerate(tqdm(items)):
+            if(ignore_runner % check_step == 0):
+                self.data.append(load_image_as_tensor(dir + path, transform=transform_256).squeeze(0))
+            ignore_runner += 1
 
         self.target_style_tensor = target_style_tensor
 
+
   def __len__(self):
         'Denotes the total number of samples'
-        return len(self.items)
+        return len(self.data)
 
   def __getitem__(self, index):
         'Generates one sample of data'
         # Select sample
-        path = self.items[index]
+        # path = self.items[index]
 
         # Load data and get label
-        X = load_image_as_tensor(self.dir + path, transform=transform_256).squeeze(0)
-
+        X = self.data[index]
+        # load_image_as_tensor(self.dir + path, transform=transform_256).squeeze(0)
         if not (len(X) == 3):
             _X = torch.zeros(3, X.shape[1], X.shape[2])
             _X[0] = X
@@ -160,12 +175,14 @@ class SINGLE_TRAINER:
         self.style_image = load_image_as_tensor(style_image_dir, transform=transform_256).to("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model_save_path = model_save_path
 
-        self.model = TransferNetworkSingle()
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # Store model on GPU for better performance
+        self.model = TransferNetworkSingle().to(device)
 
         global loss_net
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         mp.set_start_method('spawn')
+        self.model.share_memory()
 
         target_style_tensor = loss_net.get_style(self.style_image)
         training_set = Dataset(self.training_dir, target_style_tensor)
@@ -183,9 +200,9 @@ class SINGLE_TRAINER:
         self.trial.run(epochs=2)
         print('Finished Training')
 
-        print('Saving')
-        torch.save(self.model.state_dict(), self.model_save_path)
-        print('Saved')
+        # print('Saving')
+        # torch.save(self.model.state_dict(), self.model_save_path)
+        # print('Saved')
 
     def forward(self, img):
         return self.model(img).detach()
@@ -197,7 +214,7 @@ class SINGLE_TRAINER:
         print('Evaluated')
 
 
-training_images_dir = '../data/coco/'
+training_images_dir = '/home/data/train2014/'
 style_image_dir = '../data/images/style/Van_Gogh_Starry_Night.jpg'
 model_save_path = '../data/networks/model_parameters/transfer_network_single.dat'
 
