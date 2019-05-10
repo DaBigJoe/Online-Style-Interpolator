@@ -17,111 +17,32 @@ from tqdm import tqdm
 import torchbearer
 
 from loss_network import TruncatedVgg16
+from loss_network import LossNetwork
 from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256
 from transfer_network_single import TransferNetworkSingle
 import torch.multiprocessing as mp
 
-class LossNetwork:
-
-    def __init__(self):
-        self.model = TruncatedVgg16().cuda()
-
-        self.model.eval()
-        for p in self.model.parameters():
-            p.require_grads = False
-
-    def get_style(self, tensor):
-        return self.model(tensor)
-
-    def calculate_image_loss(self, transformed_tensor, original_tensor, style_tensor):
-        """
-        Calculate the style loss and content loss of an input image compared to a target style image and a
-         target content image.
-        """
-        # Forward pass each image tensor and extract outputs
-        predicted_outputs = self.model(transformed_tensor)
-        style_target_outputs = style_tensor
-        content_target_outputs = self.model(original_tensor)
-
-        # Compute and return style loss and content loss
-        style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-        content_loss = self._content_loss(predicted_outputs, content_target_outputs)
-        return style_loss, content_loss
-
-    def _content_loss(self, predicted_outputs, target_outputs):
-        """
-        Calculate the content loss between a set of predicted outputs and a set of target content outputs.
-        """
-        # Use output from relu2_2 (second item in target outputs from TruncatedVgg16 model)
-        shape = torch.tensor(target_outputs[1].shape)
-        dist = torch.norm(predicted_outputs[1] - target_outputs[1])
-        dist = dist **2
-        dist = dist.sum()
-        dist = dist **0.5
-        loss = dist #dist.pow(2).sum().div(shape.prod())
-        return loss
-
-
-    def _style_loss(self, predicted_outputs, target_outputs):
-        """
-        Calculate the style loss between a set of predicted outputs and a set of target style outputs.
-        """
-
-        def gram_matrix(m):
-            m = m.squeeze(0)
-            # Reshape target outs from c x h x w to c x hw
-            shape = torch.tensor(m.shape)
-            m1 = m.view([shape[0], shape[1] * shape[2]])
-            # Calculate gram matrix
-            return m1.mm(m1.t()).div(shape.prod())
-
-        # Sum over all of the target outputs
-        loss = 0
-        for i in range(len(target_outputs)):
-            predicted_output = predicted_outputs[i]
-            target_output = target_outputs[i]
-
-            # Reduce from singleton 4D tensors to 3D tensors
-            predicted_output = predicted_output[0]
-            target_output = target_output[0]
-
-            # Calculate gram matrices
-            predicted_gram = gram_matrix(predicted_output)
-            target_gram = gram_matrix(target_output)
-
-            # Calculate Frobenius norm of gram matrices
-            dist = torch.norm(predicted_gram - target_gram, 'fro')
-            shape = torch.tensor(predicted_gram.shape)
-            loss += dist.pow(2)
-
-        return loss
-
+# This acts as the loss function in torchbearer
 def loss_calculator(x, y):
-    global loss_net
+    global loss_net # Global variable
+
+    # y is not really a target, it holds the tesnors
+    #  that are used to calculate the loss instead
     original_tens, target_style_tens = y
 
-    new_tensor = original_tens.add(x)
-    new_tensor = torch.clamp(new_tensor, min=0, max=255)
+    style_loss, content_loss = loss_net.calculate_image_loss(x, target_style_tens, original_tens)
 
-    reg_loss = (
-            torch.sum(torch.abs(new_tensor[:, :, :, :-1] - new_tensor[:, :, :, 1:])) +
-            torch.sum(torch.abs(new_tensor[:, :, :-1, :] - new_tensor[:, :, 1:, :]))
-    )
+    style_weight = 1e12
+    content_weight = 1e5
 
-    style_loss, content_loss = loss_net.calculate_image_loss(new_tensor, original_tens, target_style_tens)
+    style_loss = style_loss.mul(style_weight)
+    content_loss = content_loss.mul(content_weight)
 
-    l1 = torch.tensor([1.0])
-    l2 = torch.tensor([5.0])
-    l3 = torch.tensor([0.0])
+    return content_loss.add(style_loss)
 
-    content_loss = content_loss.detach() * l1
-    style_loss = style_loss.detach() * l2
-    reg_loss = reg_loss.detach() * l3
-
-    loss = content_loss.add(style_loss.add(reg_loss))
-    return loss.requires_grad_(True)
-
-
+# Reads the data from the data source. This is either directly
+#  from files, or from memory. We haven't decided the best
+#  way to do it yet
 class Dataset(data.Dataset):
   'Characterizes a dataset for PyTorch'
 
@@ -130,16 +51,19 @@ class Dataset(data.Dataset):
 
         items = listdir(dir)
 
-        ignore_runner = 0
+        self.dir = dir
+        self.data = items
+
+        #ignore_runner = 0
 
         # Variable step, only sample 1 in check_step images TODO remove for final
-        check_step = 100
-        print("Check interval is", check_step)
+        #check_step = 100
+        #print("Check interval is", check_step)
 
-        for _, path in enumerate(tqdm(items)):
-            if(ignore_runner % check_step == 0):
-                self.data.append(load_image_as_tensor(dir + path, transform=transform_256).squeeze(0))
-            ignore_runner += 1
+        #for _, path in enumerate(tqdm(items)):
+        #    if(ignore_runner % check_step == 0):
+        #        self.data.append(load_image_as_tensor(dir + path, transform=transform_256).squeeze(0))
+        #    ignore_runner += 1
 
         self.target_style_tensor = target_style_tensor
 
@@ -154,17 +78,19 @@ class Dataset(data.Dataset):
         # path = self.items[index]
 
         # Load data and get label
-        X = self.data[index]
+        #X = self.data[index]
+        X = load_image_as_tensor(self.dir + self.data[index], transform=transform_256).squeeze(0)
+
         # load_image_as_tensor(self.dir + path, transform=transform_256).squeeze(0)
         if not (len(X) == 3):
-            _X = torch.zeros(3, X.shape[1], X.shape[2])
-            _X[0] = X
-            _X[1] = X
-            _X[2] = X
+            _X = torch.zeros((3, X.shape[1], X.shape[2]))
+            _X[0] = X[0]
+            _X[1] = X[0]
+            _X[2] = X[0]
             X = _X
         X = X * 255.0
 
-        y = (X, self.target_style_tensor)
+        y = (X, self.target_style_tensor.squeeze(0))
 
         return X, y
 
@@ -184,9 +110,9 @@ class SINGLE_TRAINER:
         mp.set_start_method('spawn')
         self.model.share_memory()
 
-        target_style_tensor = loss_net.get_style(self.style_image)
-        training_set = Dataset(self.training_dir, target_style_tensor)
+        target_style_tensor = self.style_image
 
+        training_set = Dataset(self.training_dir, target_style_tensor)
         train_loader = DataLoader(training_set, batch_size=4, shuffle=True)
 
         loss_function = loss_calculator
@@ -200,9 +126,9 @@ class SINGLE_TRAINER:
         self.trial.run(epochs=2)
         print('Finished Training')
 
-        # print('Saving')
-        # torch.save(self.model.state_dict(), self.model_save_path)
-        # print('Saved')
+        print('Saving')
+        torch.save(self.model.state_dict(), self.model_save_path)
+        print('Saved')
 
     def forward(self, img):
         return self.model(img).detach()
@@ -214,9 +140,9 @@ class SINGLE_TRAINER:
         print('Evaluated')
 
 
-training_images_dir = '/home/data/train2014/'
+training_images_dir = '../data/coco/' #'/home/data/train2014/'
 style_image_dir = '../data/images/style/Van_Gogh_Starry_Night.jpg'
-model_save_path = '../data/networks/model_parameters/transfer_network_single.dat'
+model_save_path = '../data/networks/model_parameters/transfer_network_single2.dat'
 
 print('INIT')
 loss_net = LossNetwork()
@@ -226,7 +152,7 @@ st = SINGLE_TRAINER(training_images_dir, style_image_dir, model_save_path)
 print('STARTING TRAINING')
 st.train()
 
-print('STARTING EVALUATION')
-st.evaluate()
+#print('STARTING EVALUATION')
+#st.evaluate()
 
 print('ALL DONE')

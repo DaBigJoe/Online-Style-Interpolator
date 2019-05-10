@@ -128,6 +128,7 @@ class TransferNetworkTrainerSingle:
             optimiser.zero_grad()
             # Pass through transfer network
             output = model(self.content_tensor)
+
             # Calculate loss
             style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor, self.content_tensor)
             style_loss = style_loss.mul(style_weight)
