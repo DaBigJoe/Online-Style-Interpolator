@@ -29,6 +29,7 @@ class TruncatedVgg16(torch.nn.Module):
         self.target_layers = [3, 8, 15, 22]
         features = list(vgg16(pretrained=True).features)[:self.target_layers[-1] + 1]
         self.features = nn.ModuleList(features).eval()
+        # print(self.features)
 
     def forward(self, x):
         outputs = []
@@ -58,44 +59,48 @@ class LossNetwork:
          target content image.
         """
         # Forward pass each image tensor and extract outputs
-        predicted_outputs = self.model(transformed_tensor)
-        style_target_outputs = self.model(style_tensor)
-        content_target_outputs = self.model(content_tensor)
+        predicted_outputs = self.model(transformed_tensor.cuda())
+        style_target_outputs = self.model(style_tensor.cuda())
+        content_target_outputs = self.model(content_tensor.cuda())
 
         # Compute and return style loss and content loss
-        style_loss = self._style_loss(predicted_outputs, style_target_outputs)
+        style_loss = self._style_loss_all(predicted_outputs, style_target_outputs)
         content_loss = self._content_loss(predicted_outputs, content_target_outputs)
         return style_loss, content_loss
 
-    def _style_loss(self, predicted_outputs, target_outputs):
+    @staticmethod
+    def _gram_matrix(m):
+        # Reshape target outs from c x h x w to c x hw
+        shape = torch.tensor(m.shape)
+        m1 = m.reshape([shape[0], shape[1] * shape[2]])
+        # Calculate gram matrix
+        return m1.mm(m1.t()).div(shape.prod())
+
+    def _style_loss_single(self, predicted_output, target_output):
+        predicted_output = predicted_output
+        target_output = target_output
+
+        # Reduce from singleton 4D tensors to 3D tensors
+        predicted_output = predicted_output[0]
+        target_output = target_output[0]
+
+        # Calculate gram matrices
+        predicted_gram = LossNetwork._gram_matrix(predicted_output)
+        target_gram = LossNetwork._gram_matrix(target_output)
+
+        # Calculate Frobenius norm of gram matrices
+        dist = torch.norm(predicted_gram - target_gram, 'fro')
+        shape = torch.tensor(predicted_gram.shape)
+        return dist.pow(2) / shape.prod()
+
+    def _style_loss_all(self, predicted_outputs, target_outputs):
         """
         Calculate the style loss between a set of predicted outputs and a set of target style outputs.
         """
-
-        def gram_matrix(m):
-            # Reshape target outs from c x h x w to c x hw
-            shape = torch.tensor(m.shape)
-            m1 = m.reshape([shape[0], shape[1] * shape[2]])
-            # Calculate gram matrix
-            return m1.mm(m1.t()).div(shape.prod())
-
         # Sum over all of the target outputs
         loss = 0
         for i in range(len(target_outputs)):
-            predicted_output = predicted_outputs[i]
-            target_output = target_outputs[i]
-
-            # Reduce from singleton 4D tensors to 3D tensors
-            predicted_output = predicted_output[0]
-            target_output = target_output[0]
-
-            # Calculate gram matrices
-            predicted_gram = gram_matrix(predicted_output)
-            target_gram = gram_matrix(target_output)
-
-            # Calculate Frobenius norm of gram matrices
-            loss += self.mse_loss(predicted_gram, target_gram)
-
+            loss += self._style_loss_single(predicted_outputs[i], target_outputs[i])
         return loss
 
     def _content_loss(self, predicted_outputs, target_outputs):
