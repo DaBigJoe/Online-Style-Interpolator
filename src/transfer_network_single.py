@@ -117,7 +117,7 @@ class TransferNetworkTrainerSingle:
     def train(self):
         model = TransferNetworkSingle().cuda()
         optimiser = optim.Adam(model.parameters(), lr=1e-3)
-        epochs = 1000
+        epochs = 0 #1000
 
         # Weight of style vs content
         style_weight = 1e12
@@ -131,9 +131,13 @@ class TransferNetworkTrainerSingle:
 
             # Calculate loss
             style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor, self.content_tensor)
+
+            #print((style_loss, content_loss))
+
             style_loss = style_loss.mul(style_weight)
             content_loss = content_loss.mul(content_weight)
             loss = content_loss.add(style_loss)
+            #print(loss)
             # Backprop (train) transfer network
             loss.backward()
             optimiser.step()
@@ -147,7 +151,7 @@ class TransferNetworkTrainerSingle:
         file_path = os.path.join(self.save_directory, file_name)
         save_tensor_as_image(final_output, file_path)
         # Show image (requires reload)
-        plot_image_tensor(load_image_as_tensor(file_path))
+        #plot_image_tensor(load_image_as_tensor(file_path))
 
 
 if __name__ == '__main__':

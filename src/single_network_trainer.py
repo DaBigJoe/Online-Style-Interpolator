@@ -34,11 +34,14 @@ def loss_calculator(x, y):
 
     style_weight = 1e12
     content_weight = 1e5
+    #print((style_loss, content_loss))
 
     style_loss = style_loss.mul(style_weight)
     content_loss = content_loss.mul(content_weight)
 
-    return content_loss.add(style_loss)
+    loss = content_loss.add(style_loss)
+
+    return loss
 
 # Reads the data from the data source. This is either directly
 #  from files, or from memory. We haven't decided the best
@@ -88,7 +91,6 @@ class Dataset(data.Dataset):
             _X[1] = X[0]
             _X[2] = X[0]
             X = _X
-        X = X * 255.0
 
         y = (X, self.target_style_tensor.squeeze(0))
 
@@ -142,7 +144,7 @@ class SINGLE_TRAINER:
 
 training_images_dir = '../data/coco/' #'/home/data/train2014/'
 style_image_dir = '../data/images/style/Van_Gogh_Starry_Night.jpg'
-model_save_path = '../data/networks/model_parameters/transfer_network_single2.dat'
+model_save_path = '../data/networks/model_parameters/transfer_network_single.dat'
 
 print('INIT')
 loss_net = LossNetwork()
