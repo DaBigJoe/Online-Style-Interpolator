@@ -7,19 +7,17 @@ Author: Joseph Early (je5g15@soton.ac.uk)
 Created: 17/05/19
 """
 
-
-import datetime
 import os
-
 import torch
-from torch import nn
 from torch import optim
 from torch.nn.functional import interpolate
+from torchvision import transforms
+from tqdm import tqdm
 
-from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256
+from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256, \
+    save_tensors_as_grid
 from loss_network import LossNetwork
 
-from tqdm import tqdm
 
 class ResidualBlock(torch.nn.Module):
     """
@@ -103,13 +101,9 @@ class TransferNetworkSingle(torch.nn.Module):
 class TransferNetworkTrainerSingle:
 
     def __init__(self, style_path, content_path, save_directory):
+        print('Creating single transfer network')
         self.style_path = style_path
         self.content_path = content_path
-
-        num_previous_runs = len([i for i in os.listdir(save_directory) if os.path.isdir(os.path.join(save_directory, i))])
-        self.save_directory = os.path.join(save_directory, "{:04d}".format(num_previous_runs+1))
-        print('Creating single transfer network')
-        print(' Save dir:', self.save_directory)
 
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -121,6 +115,12 @@ class TransferNetworkTrainerSingle:
         self.loss_network = LossNetwork()
 
         # Setup saving
+        num_previous_runs = 0
+        if os.path.exists(save_directory):
+            num_previous_runs = len([i for i in os.listdir(save_directory)
+                                     if os.path.isdir(os.path.join(save_directory, i))])
+        self.save_directory = os.path.join(save_directory, "{:04d}".format(num_previous_runs+1))
+        print(' Save dir:', self.save_directory)
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
 
@@ -138,6 +138,7 @@ class TransferNetworkTrainerSingle:
         # Train
         checkpoint = 0
         epoch_iter = tqdm(range(1, epochs+1), ncols=120)
+        image_tensors = []
         for epoch in epoch_iter:
             optimiser.zero_grad()
             # Pass through transfer network
@@ -156,21 +157,29 @@ class TransferNetworkTrainerSingle:
             epoch_iter.set_postfix(checkpoint=checkpoint, style_loss=style_loss_formatted, content_loss=content_loss_formatted)
             # Checkpoint
             if epoch % checkpoint_freq == 0 and epoch != epochs:
-                file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
-                save_tensor_as_image(output, file_path)
+                checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
+                image_tensors.append(output)
+                save_tensor_as_image(output, checkpoint_file_path)
                 checkpoint += 1
 
-        final_output = model(self.content_tensor)
         # Save image
-        file_path = os.path.join(self.save_directory, 'final.jpeg')
-        save_tensor_as_image(final_output, file_path)
-        # Show image (requires reload)
-        plot_image_tensor(load_image_as_tensor(file_path))
+        final_output = model(self.content_tensor)
+        image_tensors.append(final_output)
+
+        final_file_path = os.path.join(self.save_directory, 'final.jpeg')
+        save_tensor_as_image(final_output, final_file_path)
+
+        grid_file_path = os.path.join(self.save_directory, 'grid.jpeg')
+        save_tensors_as_grid(image_tensors, grid_file_path, 5)
+
+        # Show images (requires reload)
+        plot_image_tensor(load_image_as_tensor(final_file_path))
+        plot_image_tensor(load_image_as_tensor(grid_file_path, transform=transforms.ToTensor()))
 
 
 if __name__ == '__main__':
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
-    content_path = '../data/images/content/Landscape.jpeg'
-    save_path = '../data/images/produced/starry_night_landscape'
+    content_path = '../data/images/content/venice.jpeg'
+    save_path = '../data/images/produced/venice'
     transfer_network = TransferNetworkTrainerSingle(style_path, content_path, save_path)
-    transfer_network.train(epochs=100, num_checkpoints=10)
+    transfer_network.train()
