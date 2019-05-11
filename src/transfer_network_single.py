@@ -19,6 +19,7 @@ from torch.nn.functional import interpolate
 from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256
 from loss_network import LossNetwork
 
+from tqdm import tqdm
 
 class ResidualBlock(torch.nn.Module):
     """
@@ -104,7 +105,12 @@ class TransferNetworkTrainerSingle:
     def __init__(self, style_path, content_path, save_directory):
         self.style_path = style_path
         self.content_path = content_path
-        self.save_directory = save_directory
+
+        num_previous_runs = len([i for i in os.listdir(save_directory) if os.path.isdir(os.path.join(save_directory, i))])
+        self.save_directory = os.path.join(save_directory, "{:04d}".format(num_previous_runs+1))
+        print('Creating single transfer network')
+        print(' Save dir:', self.save_directory)
+
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
         # Load images as tensors
@@ -114,17 +120,25 @@ class TransferNetworkTrainerSingle:
         # Load loss network
         self.loss_network = LossNetwork()
 
-    def train(self):
+        # Setup saving
+        if not os.path.exists(self.save_directory):
+            os.makedirs(self.save_directory)
+
+    def train(self, epochs=1000, num_checkpoints=10):
+        print('Training single transfer network')
         model = TransferNetworkSingle().cuda()
         optimiser = optim.Adam(model.parameters(), lr=1e-3)
-        epochs = 1000
+
+        checkpoint_freq = epochs // num_checkpoints
 
         # Weight of style vs content
         style_weight = 1e12
         content_weight = 1e5
 
         # Train
-        for epoch in range(epochs+1):
+        checkpoint = 0
+        epoch_iter = tqdm(range(1, epochs+1), ncols=120)
+        for epoch in epoch_iter:
             optimiser.zero_grad()
             # Pass through transfer network
             output = model(self.content_tensor)
@@ -136,14 +150,19 @@ class TransferNetworkTrainerSingle:
             # Backprop (train) transfer network
             loss.backward()
             optimiser.step()
-            print("Epoch %d, loss %4.2f, (style loss %4.5f, content loss %4.5f)" % (epoch, loss, style_loss, content_loss))
+            # Update tqdm bar
+            style_loss_formatted = "%.0f" % style_loss
+            content_loss_formatted = "%.0f" % style_loss
+            epoch_iter.set_postfix(checkpoint=checkpoint, style_loss=style_loss_formatted, content_loss=content_loss_formatted)
+            # Checkpoint
+            if epoch % checkpoint_freq == 0 and epoch != epochs:
+                file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
+                save_tensor_as_image(output, file_path)
+                checkpoint += 1
 
         final_output = model(self.content_tensor)
         # Save image
-        if not os.path.exists(self.save_directory):
-            os.makedirs(self.save_directory)
-        file_name = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S') + '.jpg'
-        file_path = os.path.join(self.save_directory, file_name)
+        file_path = os.path.join(self.save_directory, 'final.jpeg')
         save_tensor_as_image(final_output, file_path)
         # Show image (requires reload)
         plot_image_tensor(load_image_as_tensor(file_path))
@@ -152,4 +171,6 @@ class TransferNetworkTrainerSingle:
 if __name__ == '__main__':
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
     content_path = '../data/images/content/Landscape.jpeg'
-    TransferNetworkTrainerSingle(style_path, content_path, '../data/images/produced/starry_night_landscape').train()
+    save_path = '../data/images/produced/starry_night_landscape'
+    transfer_network = TransferNetworkTrainerSingle(style_path, content_path, save_path)
+    transfer_network.train(epochs=100, num_checkpoints=10)
