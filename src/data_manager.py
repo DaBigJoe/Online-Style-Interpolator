@@ -33,11 +33,11 @@ class Dataset(data.Dataset):
         self.style_images = []
         self.style_tensors = []
         for style in listdir(style_dir):
-            style_image = load_image_as_tensor(style_dir + style).to(self.device)
+            style_image = load_image_as_tensor(style_dir + style).unsqueeze(0).to(self.device)
             style_tensor = loss_network.calculate_style_outputs(style_image)
             style_image.cpu()
 
-            self.style_images.append(style_image.cpu().detach())
+            self.style_images.append(style_image.cpu())
             self.style_tensors.append(style_tensor)
 
         self.loss_network = loss_network
@@ -52,7 +52,7 @@ class Dataset(data.Dataset):
         return self.style_tensors[index]
 
     def get_image_count(self):
-        return len(listdir(self.content_temp_dir))
+        return len(self.images)
 
     def get_image_tensor(self, index):
         image = load_image_as_tensor(self.image_dir + self.images[index])
@@ -62,10 +62,10 @@ class Dataset(data.Dataset):
         name = self.images[index]
 
         if name in self.content_temps:
-            content_tensor = torch.load(self.content_temp_dir + name)
+            content_tensor = torch.load(self.content_temp_dir + name).detach()
         else:
-            content_image = self.get_image_tensor(index).to(self.device)
-            content_tensor = self.loss_network.calculate_content_outputs(content_image)
+            content_image = self.get_image_tensor(index).unsqueeze(0).to(self.device)
+            content_tensor = self.loss_network.calculate_content_outputs(content_image).detach()
 
             torch.save(content_tensor.cpu().detach(), self.content_temp_dir + name)
             self.content_temps.add(name)

@@ -9,14 +9,13 @@ Created: 17/05/19
 
 import os
 import torch
-from os import listdir
 from torch import optim
 from torch.nn.functional import interpolate
-from torch.utils import data
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
+from data_manager import Dataset
 from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256, \
     save_tensors_as_grid
 from loss_network import LossNetwork
@@ -112,50 +111,25 @@ class TransferNetworkSingle(torch.nn.Module):
         return y
 
 
-class Dataset(data.Dataset):
-
-    def __init__(self, image_dir):
-        self.data = []
-
-        items = listdir(image_dir)
-
-        self.image_dir = image_dir
-        self.data = items
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        X = load_image_as_tensor(self.image_dir + self.data[index], transform=transform_256).squeeze(0)
-        if not (len(X) == 3):
-            _X = torch.zeros((3, X.shape[1], X.shape[2]))
-            _X[0] = X[0]
-            _X[1] = X[0]
-            _X[2] = X[0]
-            X = _X
-        return X
-
-
 class TransferNetworkTrainerSingle:
 
-    def __init__(self, style_path, content_dir, save_directory, test_image_path):
+    def __init__(self, content_dir, tmp_dir, style_dir, save_directory, test_image_path):
         print('Creating single transfer network')
-        self.style_path = style_path
-
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-        # Load content images
-        print('Loading content images')
-        train_dataset = Dataset(content_dir)
-        self.train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-        print('Found', len(self.train_loader), 'images')
-        self.test_image_tensor = load_image_as_tensor(test_image_path, transform=transform_256).to(self.device)
-
-        # Load style
-        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to(self.device)
 
         # Load loss network
         self.loss_network = LossNetwork()
+
+        # Load content images
+        print('Loading content images')
+        train_dataset = Dataset(content_dir, tmp_dir, style_dir, self.loss_network)
+        self.train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+        print('Found', len(self.train_loader), 'images')
+        self.test_image_tensor = load_image_as_tensor(test_image_path, transform=transform_256)
+        self.test_image_tensor = self.test_image_tensor.unsqueeze(0).to(self.device)
+
+        # Load style
+        self.style_tensor = train_dataset.get_style_image(0).to(self.device)
 
         # Setup saving
         num_previous_runs = 0
@@ -184,21 +158,21 @@ class TransferNetworkTrainerSingle:
         checkpoint = 0
         update_count = 0
         with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
-            image_tensors = []
+            checkpoint_tensors = []
             while update_count < num_parameter_updates:
 
-                for batch_num, content_tensors in enumerate(self.train_loader):
+                for batch_num, (image_tensors, _) in enumerate(self.train_loader):
                     if update_count >= num_parameter_updates:
                         break
 
                     optimiser.zero_grad()
+
                     # Pass through transfer network
-                    content_tensors = content_tensors.to(self.device)
-                    output = model(content_tensors, current_style_idx)
+                    image_tensors = image_tensors.to(self.device)
+                    output = model(image_tensors, current_style_idx)
 
                     # Calculate loss
-                    style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor,
-                                                                                      content_tensors)
+                    style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor, image_tensors)
                     style_loss = style_loss.mul(style_weight)
                     content_loss = content_loss.mul(content_weight)
                     loss = content_loss.add(style_loss)
@@ -209,7 +183,7 @@ class TransferNetworkTrainerSingle:
 
                     # Update tqdm bar
                     style_loss_formatted = "%.0f" % style_loss
-                    content_loss_formatted = "%.0f" % style_loss
+                    content_loss_formatted = "%.0f" % content_loss
                     progress_bar.set_postfix(checkpoint=checkpoint, style_loss=style_loss_formatted,
                                              content_loss=content_loss_formatted)
 
@@ -217,7 +191,7 @@ class TransferNetworkTrainerSingle:
                     if update_count % checkpoint_freq == 0:
                         checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
                         test_output = model(self.test_image_tensor, current_style_idx)
-                        image_tensors.append(test_output)
+                        checkpoint_tensors.append(test_output)
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
 
@@ -226,15 +200,15 @@ class TransferNetworkTrainerSingle:
 
         # Save image
         final_output = model(self.test_image_tensor, current_style_idx)
-        image_tensors.append(self.test_image_tensor)
-        image_tensors.append(self.style_tensor)
-        image_tensors.append(final_output)
+        checkpoint_tensors.append(self.test_image_tensor)
+        checkpoint_tensors.append(self.style_tensor)
+        checkpoint_tensors.append(final_output)
 
         final_file_path = os.path.join(self.save_directory, 'final.jpeg')
         save_tensor_as_image(final_output, final_file_path)
 
         grid_file_path = os.path.join(self.save_directory, 'grid.jpeg')
-        save_tensors_as_grid(image_tensors, grid_file_path, 5)
+        save_tensors_as_grid(checkpoint_tensors, grid_file_path, 5)
 
         # Show images (requires reload)
         plot_image_tensor(load_image_as_tensor(final_file_path))
@@ -242,9 +216,10 @@ class TransferNetworkTrainerSingle:
 
 
 if __name__ == '__main__':
-    style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
+    style_dir = '../data/images/style/'
     content_dir = '/home/data/train2014/'
+    tmp_dir = '/tmp/DL_content_tensors/'
     save_path = '../data/images/produced/venice'
     test_image_path = '../data/images/content/venice.jpeg'
-    transfer_network = TransferNetworkTrainerSingle(style_path, content_dir, save_path, test_image_path)
-    transfer_network.train(num_parameter_updates=500)
+    transfer_network = TransferNetworkTrainerSingle(content_dir, tmp_dir, style_dir, save_path, test_image_path)
+    transfer_network.train(num_parameter_updates=100)

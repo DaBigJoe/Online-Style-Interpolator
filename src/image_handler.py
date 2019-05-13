@@ -27,7 +27,6 @@ def load_image_as_tensor(image_path, transform=transform_256):
     image = Image.open(image_path)
     image = transform(image).float()
     image = Variable(image, requires_grad=False)
-    #image = image.unsqueeze(0)
 
     if not (len(image) == 3):
         _image = torch.zeros((3, image.shape[1], image.shape[2]))
@@ -36,7 +35,7 @@ def load_image_as_tensor(image_path, transform=transform_256):
         _image[2] = image[0]
         image = _image
 
-    return image.unsqueeze(0)
+    return image
 
 
 def save_tensor_as_image(tensor, image_path):
@@ -61,5 +60,5 @@ def plot_image_tensor(image_tensor):
     Plot a single image using matplotlib.
     """
     plt.figure()
-    plt.imshow(image_tensor[0].permute(1, 2, 0))
+    plt.imshow(image_tensor.permute(1, 2, 0))
     plt.show()

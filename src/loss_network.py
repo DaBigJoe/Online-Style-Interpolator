@@ -84,7 +84,7 @@ class LossNetwork:
 
         # Compute and return style loss and content loss
         style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-        content_loss = self._content_loss(predicted_outputs, content_target_outputs)
+        content_loss = self._content_loss(predicted_outputs[2], content_target_outputs)
         return style_loss, content_loss
 
     def _style_loss(self, predicted_outputs, target_outputs):
