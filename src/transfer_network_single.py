@@ -9,18 +9,29 @@ Created: 17/05/19
 
 import os
 import torch
+from os import listdir
 from torch import optim
 from torch.nn.functional import interpolate
+from torch.utils import data
+from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
 from image_handler import load_image_as_tensor, save_tensor_as_image, plot_image_tensor, transform_256, \
     save_tensors_as_grid
 from loss_network import LossNetwork
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torch.utils import data
-from os import listdir
+
+
+class ConditionalInstanceNorm2d(torch.nn.Module):
+
+    def __init__(self, num_channels, num_styles, affine=True):
+        super(ConditionalInstanceNorm2d, self).__init__()
+        # Create one norm 2d for each style
+        self.norm2ds = torch.nn.ModuleList([torch.nn.InstanceNorm2d(num_channels, affine=affine)
+                                            for _ in range(num_styles)])
+
+    def forward(self, x, style_idx):
+        return self.norm2ds[style_idx](x)
 
 
 class ResidualBlock(torch.nn.Module):
@@ -28,19 +39,19 @@ class ResidualBlock(torch.nn.Module):
     An encapsulation of the layers and forward pass for a residual block.
     """
 
-    def __init__(self):
+    def __init__(self, num_styles):
         super(ResidualBlock, self).__init__()
         self.conv1 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
-        self.norm1 = torch.nn.InstanceNorm2d(128, affine=True)
+        self.norm1 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
         self.conv2 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
-        self.norm2 = torch.nn.InstanceNorm2d(128, affine=True)
+        self.norm2 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
         self.relu = torch.nn.ReLU()
 
-    def forward(self, x):
+    def forward(self, x, style_idx):
         residual = x
         # Pass input through conv and norm layers as usual
-        out = self.relu(self.norm1(self.conv1(x)))
-        out = self.norm1(self.conv2(out))
+        out = self.relu(self.norm1(self.conv1(x), style_idx))
+        out = self.norm1(self.conv2(out), style_idx)
         # Add original input to output ('residual' part)
         out = out + residual
         return out
@@ -53,51 +64,50 @@ class TransferNetworkSingle(torch.nn.Module):
     Can only learn a single style.
     """
 
-    def __init__(self):
+    def __init__(self, num_styles):
         super(TransferNetworkSingle, self).__init__()
 
         # Input = 3 x 255 x 255
         # Downsampling layers
         self.conv1 = torch.nn.Conv2d(3, 32, kernel_size=9, stride=1, padding=4)
-        self.norm1 = torch.nn.InstanceNorm2d(32, affine=True)
+        self.norm1 = ConditionalInstanceNorm2d(32, num_styles, affine=True)
         self.conv2 = torch.nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
-        self.norm2 = torch.nn.InstanceNorm2d(64, affine=True)
+        self.norm2 = ConditionalInstanceNorm2d(64, num_styles, affine=True)
         self.conv3 = torch.nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
-        self.norm3 = torch.nn.InstanceNorm2d(128, affine=True)
+        self.norm3 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
 
         # Residual blocks
-        self.res1 = ResidualBlock()
-        self.res2 = ResidualBlock()
-        self.res3 = ResidualBlock()
-        self.res4 = ResidualBlock()
-        self.res5 = ResidualBlock()
+        self.res1 = ResidualBlock(num_styles)
+        self.res2 = ResidualBlock(num_styles)
+        self.res3 = ResidualBlock(num_styles)
+        self.res4 = ResidualBlock(num_styles)
+        self.res5 = ResidualBlock(num_styles)
 
         # Upsampling layers
         self.conv4 = torch.nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1)
-        self.norm4 = torch.nn.InstanceNorm2d(64, affine=True)
+        self.norm4 = ConditionalInstanceNorm2d(64, num_styles, affine=True)
         self.conv5 = torch.nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1)
-        self.norm5 = torch.nn.InstanceNorm2d(32, affine=True)
+        self.norm5 = ConditionalInstanceNorm2d(32, num_styles, affine=True)
         self.conv6 = torch.nn.Conv2d(32, 3, kernel_size=9, stride=1, padding=4)
 
         self.relu = torch.nn.ReLU()
 
-    def forward(self, x):
-
+    def forward(self, x, style_idx):
         # Apply downsampling
-        y = self.relu(self.norm1(self.conv1(x)))
-        y = self.relu(self.norm2(self.conv2(y)))
-        y = self.relu(self.norm3(self.conv3(y)))
+        y = self.relu(self.norm1(self.conv1(x), style_idx))
+        y = self.relu(self.norm2(self.conv2(y), style_idx))
+        y = self.relu(self.norm3(self.conv3(y), style_idx))
         # Apply residual blocks
-        y = self.res1(y)
-        y = self.res2(y)
-        y = self.res3(y)
-        y = self.res4(y)
-        y = self.res5(y)
+        y = self.res1(y, style_idx)
+        y = self.res2(y, style_idx)
+        y = self.res3(y, style_idx)
+        y = self.res4(y, style_idx)
+        y = self.res5(y, style_idx)
         # Apply upsampling
         y = torch.nn.functional.interpolate(y, mode='nearest', scale_factor=2)  # Upsample by 2
-        y = self.relu(self.norm4(self.conv4(y)))
+        y = self.relu(self.norm4(self.conv4(y), style_idx))
         y = torch.nn.functional.interpolate(y, mode='nearest', scale_factor=2)  # Upsample by 2
-        y = self.relu(self.norm5(self.conv5(y)))
+        y = self.relu(self.norm5(self.conv5(y), style_idx))
         y = self.conv6(y)
         return y
 
@@ -158,8 +168,10 @@ class TransferNetworkTrainerSingle:
             os.makedirs(self.save_directory)
 
     def train(self, num_parameter_updates=40000, num_checkpoints=9):
+        num_styles = 1
+
         print('Training single transfer network')
-        model = TransferNetworkSingle().to(self.device)
+        model = TransferNetworkSingle(num_styles).to(self.device)
         optimiser = optim.Adam(model.parameters(), lr=1e-3)
         checkpoint_freq = num_parameter_updates // num_checkpoints
 
@@ -168,6 +180,7 @@ class TransferNetworkTrainerSingle:
         content_weight = 1e5
 
         # Train
+        current_style_idx = 0
         checkpoint = 0
         update_count = 0
         with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
@@ -181,7 +194,7 @@ class TransferNetworkTrainerSingle:
                     optimiser.zero_grad()
                     # Pass through transfer network
                     content_tensors = content_tensors.to(self.device)
-                    output = model(content_tensors)
+                    output = model(content_tensors, current_style_idx)
 
                     # Calculate loss
                     style_loss, content_loss = self.loss_network.calculate_image_loss(output, self.style_tensor,
@@ -203,7 +216,7 @@ class TransferNetworkTrainerSingle:
                     # Checkpoint
                     if update_count % checkpoint_freq == 0:
                         checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
-                        test_output = model(self.test_image_tensor)
+                        test_output = model(self.test_image_tensor, current_style_idx)
                         image_tensors.append(test_output)
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
@@ -212,7 +225,7 @@ class TransferNetworkTrainerSingle:
                     progress_bar.update(1)
 
         # Save image
-        final_output = model(self.test_image_tensor)
+        final_output = model(self.test_image_tensor, current_style_idx)
         image_tensors.append(self.test_image_tensor)
         image_tensors.append(self.style_tensor)
         image_tensors.append(final_output)
@@ -234,4 +247,4 @@ if __name__ == '__main__':
     save_path = '../data/images/produced/venice'
     test_image_path = '../data/images/content/venice.jpeg'
     transfer_network = TransferNetworkTrainerSingle(style_path, content_dir, save_path, test_image_path)
-    transfer_network.train()
+    transfer_network.train(num_parameter_updates=500)
