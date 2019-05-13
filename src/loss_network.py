@@ -52,6 +52,26 @@ class LossNetwork:
             p.require_grads = False
         self.mse_loss = torch.nn.MSELoss()
 
+    def calculate_style(self, tensor):
+        return self.model(tensor)
+
+    def calculate_content(self, tensor):
+        return self.model(tensor)[2]
+
+
+    def calculate_loss_with_precomputed(self, image_tensor, style_tensor, content_tensor):
+        """
+                Calculate the style loss and content loss of an input image compared to a target style image and a
+                 target content image.
+                """
+        # Forward pass each image tensor and extract outputs
+        predicted_outputs = self.model(image_tensor)
+
+        # Compute and return style loss and content loss
+        style_loss = self._style_loss(predicted_outputs, style_tensor)
+        content_loss = self._content_loss(predicted_outputs, content_tensor)
+        return style_loss, content_loss
+
     def calculate_image_loss(self, transformed_tensor, style_tensor, content_tensor):
         """
         Calculate the style loss and content loss of an input image compared to a target style image and a
