@@ -62,7 +62,7 @@ class Dataset(data.Dataset):
         name = self.images[index]
 
         if name in self.content_temps:
-            content_tensor = torch.load(self.content_temp_dir + name).detach()
+            content_tensor = torch.load(self.content_temp_dir + name).to(self.device).detach()
         else:
             content_image = self.get_image_tensor(index).unsqueeze(0).to(self.device)
             content_tensor = self.loss_network.calculate_content_outputs(content_image).detach()
