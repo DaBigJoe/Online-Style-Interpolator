@@ -5,14 +5,12 @@ Uses a pre-trained network (VGG-16 trained on ImageNet) to evaluate the loss of 
 style and content images.
 
 Author: Joseph Early (je5g15@soton.ac.uk)
-Created: 17/05/19
+Created: 17/04/19
 """
 
 import torch
 from torch import nn
 from torchvision.models import vgg16
-
-from image_handler import load_image_as_tensor, transform_256
 
 
 class TruncatedVgg16(torch.nn.Module):
@@ -53,19 +51,40 @@ class LossNetwork:
             p.require_grads = False
         self.mse_loss = torch.nn.MSELoss()
 
-    def calculate_image_loss(self, transformed_tensor, style_tensor, content_tensor):
+    def calculate_style_outputs(self, tensor):
+        """
+        Pass a tensor through the network and get the style outputs.
+        """
+        return self.model(tensor)
+
+    def calculate_content_outputs(self, tensor):
+        """
+        Pass a tensor through the network and get the content outputs.
+        """
+        return self.model(tensor)[2]
+
+    def calculate_image_loss(self, image_tensor, style_tensor, content_tensor):
         """
         Calculate the style loss and content loss of an input image compared to a target style image and a
          target content image.
         """
         # Forward pass each image tensor and extract outputs
-        predicted_outputs = self.model(transformed_tensor.cuda())
-        style_target_outputs = self.model(style_tensor.cuda())
-        content_target_outputs = self.model(content_tensor.cuda())
+        style_target_outputs = self.calculate_style_outputs(style_tensor)
+        content_target_outputs = self.calculate_content_outputs(content_tensor.cuda())
+
+        return self.calculate_loss_with_precomputed(image_tensor, style_target_outputs, content_target_outputs)
+
+    def calculate_loss_with_precomputed(self, image_tensor, style_target_outputs, content_target_outputs):
+        """
+        Calculate the style loss and content loss of an input image compared to the target style outputs and the
+         target content outputs.
+        """
+        # Forward pass each image tensor and extract outputs
+        predicted_outputs = self.model(image_tensor)
 
         # Compute and return style loss and content loss
         style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-        content_loss = self._content_loss(predicted_outputs, content_target_outputs)
+        content_loss = self._content_loss(predicted_outputs[2], content_target_outputs)
         return style_loss, content_loss
 
     def _style_loss(self, predicted_outputs, target_outputs):
@@ -83,7 +102,7 @@ class LossNetwork:
         Calculate the content loss between a set of predicted outputs and a set of target content outputs.
         """
         # Use output from relu3_3 (third item in target outputs from TruncatedVgg16 model)
-        return self.mse_loss(target_outputs[2], predicted_outputs[2])
+        return self.mse_loss(target_outputs, predicted_outputs)
 
     def _style_loss_single(self, predicted_output, target_output):
         predicted_output = predicted_output
@@ -106,28 +125,3 @@ class LossNetwork:
         m1 = m.reshape([shape[0], shape[1] * shape[2]])
         # Calculate gram matrix
         return m1.mm(m1.t()).div(shape.prod())
-
-
-if __name__ == '__main__':
-    """
-    Runs some simple tests to ensure everything is working
-    """
-    # Load style image tensor
-    style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
-    style_tensor = load_image_as_tensor(style_path, transform=transform_256)
-
-    # Load content image tensor
-    content_path = '../data/images/content/Landscape.jpeg'
-    content_tensor = load_image_as_tensor(content_path, transform=transform_256)
-
-    # Style loss should be zero since it's comparing to itself
-    print('Testing style tensor match')
-    test_loss = LossNetwork().calculate_image_loss(style_tensor, style_tensor, content_tensor)
-    assert test_loss[0] == 0
-    assert test_loss[1] > 0
-
-    # Content loss should be zero since it's comparing to itself
-    print('Testing content tensor match')
-    test_loss = LossNetwork().calculate_image_loss(content_tensor, style_tensor, content_tensor)
-    assert test_loss[0] > 0
-    assert test_loss[1] == 0

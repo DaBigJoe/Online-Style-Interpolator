@@ -11,6 +11,8 @@ from PIL import Image
 from torch.autograd import Variable
 from torchvision import transforms
 
+import torch
+
 # Consistent transform to scale image to 256 x 256
 transform_256 = transforms.Compose([
                     transforms.Resize((256, 256)),
@@ -25,7 +27,14 @@ def load_image_as_tensor(image_path, transform=transform_256):
     image = Image.open(image_path)
     image = transform(image).float()
     image = Variable(image, requires_grad=False)
-    image = image.unsqueeze(0)
+
+    if not (len(image) == 3):
+        _image = torch.zeros((3, image.shape[1], image.shape[2]))
+        _image[0] = image[0]
+        _image[1] = image[0]
+        _image[2] = image[0]
+        image = _image
+
     return image
 
 
@@ -43,7 +52,7 @@ def save_tensors_as_grid(tensors, image_path, nrow, cwidth=256, cheight=256):
     reshaped_tensors = []
     for tensor in tensors:
         reshaped_tensors.append(tensor.view((3, cwidth, cheight)))
-    torchvision.utils.save_image(reshaped_tensors, image_path, nrow=5, padding=10, normalize=True)
+    torchvision.utils.save_image(reshaped_tensors, image_path, nrow=5, padding=10, normalize=True, scale_each=True)
 
 
 def plot_image_tensor(image_tensor):
@@ -51,5 +60,5 @@ def plot_image_tensor(image_tensor):
     Plot a single image using matplotlib.
     """
     plt.figure()
-    plt.imshow(image_tensor[0].permute(1, 2, 0))
+    plt.imshow(image_tensor.permute(1, 2, 0))
     plt.show()
