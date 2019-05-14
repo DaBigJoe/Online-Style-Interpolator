@@ -113,7 +113,7 @@ class TransferNetworkSingle(torch.nn.Module):
 
 class TransferNetworkTrainerSingle:
 
-    def __init__(self, content_dir, tmp_dir, style_dir, save_directory, test_image_path):
+    def __init__(self, content_dir, style_dir, save_directory, test_image_path):
         print('Creating single transfer network')
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -122,7 +122,7 @@ class TransferNetworkTrainerSingle:
 
         # Load content images
         print('Loading content images')
-        self.train_dataset = Dataset(content_dir, tmp_dir, style_dir, self.loss_network)
+        self.train_dataset = Dataset(content_dir, style_dir, self.loss_network)
         self.train_loader = DataLoader(self.train_dataset, batch_size=4, shuffle=False)
         print('Found', len(self.train_loader), 'images')
         self.test_image_tensor = load_image_as_tensor(test_image_path, transform=transform_256)
@@ -141,7 +141,7 @@ class TransferNetworkTrainerSingle:
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
 
-    def train(self, num_parameter_updates=40000, num_checkpoints=9):
+    def train(self, num_parameter_updates=40000, num_checkpoints=1000):
         num_styles = self.train_dataset.get_style_count()
 
         print('Training single transfer network')
@@ -228,8 +228,7 @@ class TransferNetworkTrainerSingle:
 if __name__ == '__main__':
     style_dir = '../data/images/style/'
     content_dir = '../data/coco/'
-    tmp_dir = '../data/temp/'
-    save_path = '../data/images/produced/venice'
+    save_path = '../data/checkpoints/'
     test_image_path = '../data/images/content/venice.jpeg'
-    transfer_network = TransferNetworkTrainerSingle(content_dir, tmp_dir, style_dir, save_path, test_image_path)
-    transfer_network.train(num_parameter_updates=100)
+    transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path)
+    transfer_network.train() #num_parameter_updates=100)

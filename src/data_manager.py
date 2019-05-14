@@ -19,16 +19,11 @@ class Dataset(data.Dataset):
     A Dataset for loading the data used to train the network
     """
 
-    def __init__(self, image_dir, content_temp_dir,  style_dir, loss_network):
+    def __init__(self, image_dir,  style_dir, loss_network):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
         self.image_dir = image_dir
         self.images = listdir(image_dir)
-
-        self.content_temp_dir = content_temp_dir
-        if not os.path.exists(content_temp_dir):
-            os.makedirs(content_temp_dir)
-        self.content_temps = set(listdir(content_temp_dir))
 
         self.style_images = []
         self.style_tensors = []
@@ -46,7 +41,7 @@ class Dataset(data.Dataset):
 
         self.loss_network = loss_network
 
-        print('Dataset Loaded, Found: ' + str(len(self.style_images)) + ' style images and ' + str(len(self.images)) + ' content images')
+        print('Dataset Loaded, Found: ' + str(len(self.style_images)) + ' style images and ' + str(len(self.images)) + ' content tensors')
 
     def get_style_count(self):
         return len(self.style_images)
@@ -67,16 +62,10 @@ class Dataset(data.Dataset):
     def get_content_tensor(self, index):
         name = self.images[index]
 
-        if name in self.content_temps:
-            content_tensor = torch.load(self.content_temp_dir + name).to(self.device).detach()
-        else:
-            content_image = self.get_image_tensor(index).unsqueeze(0).to(self.device)
-            content_tensor = self.loss_network.calculate_content_outputs(content_image).detach()
+        content_image = load_image_as_tensor(self.image_dir + name).to(self.device).detach()
+        content_tensor = self.loss_network.calculate_content_outputs(content_image.unsqueeze(0)).detach()
 
-            torch.save(content_tensor.cpu().detach(), self.content_temp_dir + name)
-            self.content_temps.add(name)
-
-        return content_tensor.squeeze(0)
+        return content_tensor
 
     def __len__(self):
         return self.get_image_count()
