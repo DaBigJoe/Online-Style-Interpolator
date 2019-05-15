@@ -7,7 +7,7 @@ from src.data_manager import Dataset
 from src.image_handler import load_image_as_tensor, normalise_batch
 from src.loss_network import LossNetwork
 from src.transfer_network import TransferNetwork
-
+from tqdm import tqdm
 
 def train():
     # Args
@@ -15,7 +15,7 @@ def train():
     image_dir = '/home/data/train2014/'
     style_dir = '../data/images/style/'
     batch_size = 4
-    epochs = 2  # TODO change to parameter updates
+    num_parameter_updates = 100  # TODO change to parameter updates
     content_weight = 1e5
     style_weight = 1e10
 
@@ -35,41 +35,47 @@ def train():
 
     # Setup transfer network
     transfer_network = TransferNetwork(style_num).to(device)
+    transfer_network.train()
     optimizer = Adam(transfer_network.parameters(), lr=1e-3)
 
     # Setup loss network
     loss_network = LossNetwork(normalise_batch(style_tensors), device)
 
-    for e in range(epochs):
-        transfer_network.train()
-        count = 0  # Number of images that have been seen
-        for batch_id, x in enumerate(train_loader):
-            n_batch = len(x)
+    update_count = 0  # Number of parameter updates that have occurred
+    with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
+        while update_count < num_parameter_updates:
+            for _, x in enumerate(train_loader):
+                if update_count >= num_parameter_updates:
+                    break
 
-            if n_batch < batch_size:
-                break
+                # Begin optimisation step
+                optimizer.zero_grad()
 
-            count += n_batch
-            optimizer.zero_grad()  # initialize with zero gradients
+                # Get style for this step
+                style_idx = update_count % style_num
 
-            style_idx = batch_id % style_num
-            y = transfer_network(x.to(device), style_idx=style_idx)
+                # Perform image transfer and normalise
+                y = transfer_network(x.to(device), style_idx=style_idx)
+                x = normalise_batch(x).to(device)
+                y = normalise_batch(y).to(device)
 
-            x = normalise_batch(x).to(device)
-            y = normalise_batch(y).to(device)
+                # Calculate loss
+                content_loss, style_loss = loss_network.calculate_loss(x, y, style_idx)
+                content_loss *= content_weight
+                style_loss *= style_weight
+                total_loss = content_loss + style_loss
 
-            content_loss, style_loss = loss_network.calculate_loss(x, y, style_idx)
+                # Backprop
+                total_loss.backward()
+                optimizer.step()
 
-            content_loss *= content_weight
-            style_loss *= style_weight
+                # Update tqdm bar
+                progress_bar.update(1)
+                progress_bar.set_postfix(style_loss="%.0f" % style_loss,
+                                         content_loss="%.0f" % content_loss)
 
-            total_loss = content_loss + style_loss
-            total_loss.backward()
-            optimizer.step()
-
-            print(batch_id, content_loss, style_loss)
-
-
+                # Step
+                update_count += 1
 
 
 # def stylize(args):
