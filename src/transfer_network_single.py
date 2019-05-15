@@ -228,8 +228,8 @@ class TransferNetworkTrainerSingle:
                     optimiser.step()
 
                     # Update tqdm bar
-                    style_loss_formatted = "%.5f" % style_loss
-                    content_loss_formatted = "%.5f" % content_loss
+                    style_loss_formatted = "%.0f" % style_loss
+                    content_loss_formatted = "%.0f" % content_loss
                     progress_bar.set_postfix(checkpoint=checkpoint, style_loss=style_loss_formatted,
                                              content_loss=content_loss_formatted)
 
