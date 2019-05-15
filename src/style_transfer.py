@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from src.data_manager import Dataset
 from src.image_handler import load_image_as_tensor, normalise_batch
 from src.loss_network import LossNetwork
-from src.transfer_network_single import TransferNetworkSingle
+from src.transfer_network import TransferNetwork
 
 
 def train():
@@ -34,7 +34,7 @@ def train():
     style_tensors = torch.stack(style_tensors).to(device)
 
     # Setup transfer network
-    transfer_network = TransferNetworkSingle(style_num).to(device)
+    transfer_network = TransferNetwork(style_num).to(device)
     optimizer = Adam(transfer_network.parameters(), lr=1e-3)
 
     # Setup loss network
