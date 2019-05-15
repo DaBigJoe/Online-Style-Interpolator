@@ -40,19 +40,17 @@ class ResidualBlock(torch.nn.Module):
 
     def __init__(self, num_styles):
         super(ResidualBlock, self).__init__()
-        self.refl1 = torch.nn.ReflectionPad2d(1)
-        self.conv1 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=0)
+        self.conv1 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
         self.norm1 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
-        self.refl2 = torch.nn.ReflectionPad2d(1)
-        self.conv2 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=0)
+        self.conv2 = torch.nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
         self.norm2 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x, style_idx):
         residual = x
         # Pass input through conv and norm layers as usual
-        out = self.relu(self.norm1(self.conv1(self.refl1(x)), style_idx))
-        out = self.norm1(self.conv2(self.refl2(out)), style_idx)
+        out = self.relu(self.norm1(self.conv1(x), style_idx))
+        out = self.norm1(self.conv2(out), style_idx)
         # Add original input to output ('residual' part)
         out = out + residual
         return out
@@ -70,14 +68,11 @@ class TransferNetworkSingle(torch.nn.Module):
 
         # Input = 3 x 255 x 255
         # Downsampling layers
-        self.refl1 = torch.nn.ReflectionPad2d(4)
-        self.conv1 = torch.nn.Conv2d(3, 32, kernel_size=9, stride=1, padding=0)
+        self.conv1 = torch.nn.Conv2d(3, 32, kernel_size=9, stride=1, padding=4)
         self.norm1 = ConditionalInstanceNorm2d(32, num_styles, affine=True)
-        self.refl2 = torch.nn.ReflectionPad2d(1)
-        self.conv2 = torch.nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=0)
+        self.conv2 = torch.nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
         self.norm2 = ConditionalInstanceNorm2d(64, num_styles, affine=True)
-        self.refl3 = torch.nn.ReflectionPad2d(1)
-        self.conv3 = torch.nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=0)
+        self.conv3 = torch.nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
         self.norm3 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
 
         # Residual blocks
@@ -87,54 +82,32 @@ class TransferNetworkSingle(torch.nn.Module):
         self.res4 = ResidualBlock(num_styles)
         self.res5 = ResidualBlock(num_styles)
 
-        # Upsampling Layers
-        self.ups4 = torch.nn.Upsample(mode='nearest', scale_factor=2)
-        self.refl4 = torch.nn.ReflectionPad2d(1)
-        self.conv4 = torch.nn.Conv2d(128,64,kernel_size=3,stride=1)
-
+        # Upsampling layers
+        self.conv4 = torch.nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1)
         self.norm4 = ConditionalInstanceNorm2d(64, num_styles, affine=True)
-
-        self.ups5 = torch.nn.Upsample(mode='nearest', scale_factor=2)
-        self.refl5 = torch.nn.ReflectionPad2d(1)
-        self.conv5 = torch.nn.Conv2d(64,32,kernel_size=3,stride=1)
-
+        self.conv5 = torch.nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1)
         self.norm5 = ConditionalInstanceNorm2d(32, num_styles, affine=True)
-
-        self.refl6 = torch.nn.ReflectionPad2d(4)
-        self.conv6 = torch.nn.Conv2d(32,3,kernel_size=9,stride=1)
+        self.conv6 = torch.nn.Conv2d(32, 3, kernel_size=9, stride=1, padding=4) #, padding_model='reflect')
 
         self.relu = torch.nn.ReLU()
 
     def forward(self, x, style_idx):
         # Apply downsampling
-        y = self.relu(self.norm1(self.conv1(self.refl1(x)), style_idx))
-        y = self.relu(self.norm2(self.conv2(self.refl2(y)), style_idx))
-        y = self.relu(self.norm3(self.conv3(self.refl3(y)), style_idx))
+        y = self.relu(self.norm1(self.conv1(x), style_idx))
+        y = self.relu(self.norm2(self.conv2(y), style_idx))
+        y = self.relu(self.norm3(self.conv3(y), style_idx))
         # Apply residual blocks
         y = self.res1(y, style_idx)
         y = self.res2(y, style_idx)
         y = self.res3(y, style_idx)
         y = self.res4(y, style_idx)
         y = self.res5(y, style_idx)
-
         # Apply upsampling
-        y = self.ups4(y)
-        y = self.refl4(y)
-        y = self.conv4(y)
-
-        y = self.norm4(y, style_idx)
-        y = self.relu(y)
-
-        y = self.ups5(y)
-        y = self.refl5(y)
-        y = self.conv5(y)
-
-        y = self.norm5(y, style_idx)
-        y = self.relu(y)
-
-        y = self.refl6(y)
+        y = torch.nn.functional.interpolate(y, mode='nearest', scale_factor=2)  # Upsample by 2
+        y = self.relu(self.norm4(self.conv4(y), style_idx))
+        y = torch.nn.functional.interpolate(y, mode='nearest', scale_factor=2)  # Upsample by 2
+        y = self.relu(self.norm5(self.conv5(y), style_idx))
         y = self.conv6(y)
-
         return y
 
 
@@ -176,7 +149,7 @@ class TransferNetworkTrainerSingle:
 
         self.stats_file = open(stats_file_path + str(num_previous_runs) + '.csv', 'w+')
 
-    def train(self, num_parameter_updates=40000, num_checkpoints=1000, num_styles=2):
+    def train(self, num_parameter_updates=40000, num_checkpoints=9, num_styles=2):
         assert num_styles <= self.train_dataset.get_style_count()
         num_styles = self.train_dataset.get_style_count()
 
