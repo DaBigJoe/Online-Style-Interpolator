@@ -22,6 +22,7 @@ def train():
     style_dir = '../data/images/style/'
     checkpoint_dir = '../data/checkpoints/'
     stats_dir = '../data/stats/'
+    model_dir = '../data/networks/model_parameters'
     test_image_path = '../data/images/content/venice.jpeg'
     batch_size = 4
     num_parameter_updates = 100  # TODO change to parameter updates
@@ -33,15 +34,12 @@ def train():
     # Ensure save directories exist
     check_dir(checkpoint_dir)
     check_dir(stats_dir)
+    check_dir(model_dir)
 
     # Get unique run id
     unique_run_id = "{:04d}".format(len([i for i in os.listdir(checkpoint_dir)
                                          if os.path.isdir(os.path.join(checkpoint_dir, i))]) + 1)
     print('Starting run', unique_run_id)
-
-    # Setup checkpointing
-    checkpoint_path = os.path.join(checkpoint_dir, unique_run_id)
-    os.makedirs(checkpoint_path)
 
     # Load dataset
     train_dataset = Dataset(image_dir)
@@ -60,6 +58,15 @@ def train():
 
     # Setup loss network
     loss_network = LossNetwork(normalise_batch(style_tensors), device)
+
+    # Setup check pointing
+    checkpoint_path = os.path.join(checkpoint_dir, unique_run_id)
+    os.makedirs(checkpoint_path)
+    print('Saving checkpoints to', checkpoint_path)
+
+    # Setup model saving
+    model_save_path = os.path.join(model_dir, unique_run_id)
+    print('Saving model to', model_save_path)
 
     # Setup logging
     stats_path = stats_dir + 'stats' + unique_run_id + '.csv'
@@ -117,6 +124,8 @@ def train():
     # Finish stats
     stats_file.close()
 
+    # Save model
+    torch.save(transfer_network.state_dict(), model_save_path)
 
 # def stylize(args):
 #     device = torch.device("cuda" if args.cuda else "cpu")
@@ -137,6 +146,7 @@ def train():
 #         output = style_model(content_image, style_id=[args.style_id]).cpu()
 #
 #     utils.save_image('output/' + args.output_image + '_style' + str(args.style_id) + '.jpg', output[0])
+
 
 if __name__ == "__main__":
     train()
