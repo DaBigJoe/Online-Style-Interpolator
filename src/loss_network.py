@@ -101,22 +101,21 @@ class LossNetwork:
         """
         Calculate the content loss between a set of predicted outputs and a set of target content outputs.
         """
-        # Use output from relu3_3 (third item in target outputs from TruncatedVgg16 model)
-        return self.mse_loss(target_outputs, predicted_outputs)
+        losses = torch.zeros((len(predicted_outputs)))
+        target_output = target_outputs[0]
+        for i in range(len(predicted_outputs)):
+            losses[i] = self.mse_loss(target_output, predicted_outputs[i])
+        loss = torch.mean(losses)
+        return loss
 
-    def _style_loss_single(self, predicted_output, target_output):
-        predicted_output = predicted_output
-        target_output = target_output
-
-        # Reduce from singleton 4D tensors to 3D tensors
-        predicted_output = predicted_output[0]
-        target_output = target_output[0]
-
-        # Calculate gram matrices
-        predicted_gram = LossNetwork._gram_matrix(predicted_output)
-        target_gram = LossNetwork._gram_matrix(target_output)
-
-        return self.mse_loss(predicted_gram, target_gram)
+    def _style_loss_single(self, predicted_outputs, target_outputs):
+        losses = torch.zeros((len(predicted_outputs)))
+        target_gram = LossNetwork._gram_matrix(target_outputs[0])
+        for i in range(len(predicted_outputs)):
+            predicted_gram = LossNetwork._gram_matrix(predicted_outputs[i])
+            losses[i] = self.mse_loss(predicted_gram, target_gram)
+        loss = torch.mean(losses)
+        return loss
 
     @staticmethod
     def _gram_matrix(m):

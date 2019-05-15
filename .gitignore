@@ -1,3 +1,5 @@
 .idea/*
 */__pycache__/*
-data/content/produced
+data/images/produced
+data/checkpoints
+data/networks/model_parameters
