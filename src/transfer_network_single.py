@@ -231,7 +231,7 @@ class TransferNetworkTrainerSingle:
                     if update_count % checkpoint_freq == 0:
                         checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
                         test_output = model(self.test_image_tensor, 0)
-                        checkpoint_tensors.append(test_output)
+                        #checkpoint_tensors.append(test_output)
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
 
@@ -244,16 +244,16 @@ class TransferNetworkTrainerSingle:
         torch.save(model.state_dict(), self.model_save_path)
 
         # Save image
-        final_output = model(self.test_image_tensor, 0)
-        checkpoint_tensors.append(self.test_image_tensor)
-        checkpoint_tensors.append(self.train_dataset.get_style_tensor(0))
-        checkpoint_tensors.append(final_output)
+        #final_output = model(self.test_image_tensor, 0)
+        #checkpoint_tensors.append(self.test_image_tensor)
+        #checkpoint_tensors.append(self.train_dataset.get_style_tensor(0))
+        #checkpoint_tensors.append(final_output)
 
-        final_file_path = os.path.join(self.save_directory, 'final.jpeg')
-        save_tensor_as_image(final_output, final_file_path)
+        #final_file_path = os.path.join(self.save_directory, 'final.jpeg')
+        #save_tensor_as_image(final_output, final_file_path)
 
-        grid_file_path = os.path.join(self.save_directory, 'grid.jpeg')
-        save_tensors_as_grid(checkpoint_tensors, grid_file_path, 5)
+        #grid_file_path = os.path.join(self.save_directory, 'grid.jpeg')
+        #save_tensors_as_grid(checkpoint_tensors, grid_file_path, 5)
 
         # Show images (requires reload)
         #plot_image_tensor(load_image_as_tensor(final_file_path))
