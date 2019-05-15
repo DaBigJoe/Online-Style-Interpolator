@@ -113,7 +113,7 @@ class TransferNetworkSingle(torch.nn.Module):
 
 class TransferNetworkTrainerSingle:
 
-    def __init__(self, content_dir, style_dir, save_directory, test_image_path):
+    def __init__(self, content_dir, style_dir, save_directory, test_image_path, stats_file_path):
         print('Creating single transfer network')
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -141,6 +141,8 @@ class TransferNetworkTrainerSingle:
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
 
+        self.stats_file = open(stats_file_path, 'w+')
+
     def train(self, num_parameter_updates=40000, num_checkpoints=1000):
         num_styles = self.train_dataset.get_style_count()
 
@@ -154,7 +156,6 @@ class TransferNetworkTrainerSingle:
         content_weight = 1e5
 
         # Train
-        current_style_idx = 0
         checkpoint = 0
         update_count = 0
         style_count = 0
@@ -173,7 +174,7 @@ class TransferNetworkTrainerSingle:
 
                     # Pass through transfer network
                     image_tensors = image_tensors.to(self.device)
-                    output = model(image_tensors, current_style_idx)
+                    output = model(image_tensors, style_count % num_styles)
 
                     # Calculate loss
                     style_loss, content_loss = self.loss_network.calculate_loss_with_precomputed(output, style_tensor, content_target)
@@ -194,20 +195,23 @@ class TransferNetworkTrainerSingle:
                     # Checkpoint
                     if update_count % checkpoint_freq == 0:
                         checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
-                        test_output = model(self.test_image_tensor, current_style_idx)
+                        test_output = model(self.test_image_tensor, style_count % num_styles)
                         checkpoint_tensors.append(test_output)
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
+
+                    self.stats_file.write(str(update_count) + ', ' + str(style_loss.item()) + ', ' + str(content_loss.item()) + '\n')
 
                     update_count += 1
                     progress_bar.update(1)
 
                     style_count += 1
 
+        self.stats_file.close()
         torch.save(model.state_dict(), '/home/stonarda/uni/deep_learning/updated_model.pt')
 
         # Save image
-        final_output = model(self.test_image_tensor, current_style_idx)
+        final_output = model(self.test_image_tensor, 0)
         checkpoint_tensors.append(self.test_image_tensor)
         checkpoint_tensors.append(self.style_tensor)
         checkpoint_tensors.append(final_output)
@@ -230,5 +234,6 @@ if __name__ == '__main__':
     content_dir = '../data/coco/'
     save_path = '../data/checkpoints/'
     test_image_path = '../data/images/content/venice.jpeg'
-    transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path)
-    transfer_network.train() #num_parameter_updates=100)
+    stats_file_path = '../stats_file.csv'
+    transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path, stats_file_path)
+    transfer_network.train()
