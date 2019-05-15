@@ -45,8 +45,11 @@ def save_tensor_as_image(tensor, image_path):
     """
     Save a single 3D tensor to the given image path
     """
-    torchvision.utils.save_image(tensor, image_path)
-
+    #torchvision.utils.save_image(tensor, image_path)
+    img = tensor.clone().clamp(0, 255).numpy()
+    img = img.transpose(1, 2, 0).astype("uint8")
+    img = Image.fromarray(img)
+    img.save(image_path)
 
 def save_tensors_as_grid(tensors, image_path, nrow, cwidth=256, cheight=256):
     """

@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.data_manager import Dataset, StyleManager
-from src.image_handler import normalise_batch
+from src.image_handler import normalise_batch, load_image_as_tensor, save_tensor_as_image
 from src.loss_network import LossNetwork
 from src.transfer_network import TransferNetwork
 
@@ -22,11 +22,13 @@ def train():
     style_dir = '../data/images/style/'
     checkpoint_dir = '../data/checkpoints/'
     stats_dir = '../data/stats/'
+    test_image_path = '../data/images/content/venice.jpeg'
     batch_size = 4
     num_parameter_updates = 100  # TODO change to parameter updates
     content_weight = 1e5
     style_weight = 1e10
     style_idxs = [0, 3]
+    checkpoint_freq = 10
 
     # Ensure save directories exist
     check_dir(checkpoint_dir)
@@ -37,9 +39,14 @@ def train():
                                          if os.path.isdir(os.path.join(checkpoint_dir, i))]) + 1)
     print('Starting run', unique_run_id)
 
+    # Setup checkpointing
+    checkpoint_path = os.path.join(checkpoint_dir, unique_run_id)
+    os.makedirs(checkpoint_path)
+
     # Load dataset
     train_dataset = Dataset(image_dir)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)  # to provide a batch loader
+    test_image_tensor = load_image_as_tensor(test_image_path).unsqueeze(0).to(device)
 
     # Load styles
     style_manager = StyleManager(style_dir, device)
@@ -60,6 +67,7 @@ def train():
     print('Saving stats to', stats_path)
 
     update_count = 0  # Number of parameter updates that have occurred
+    checkpoint = 0  # Current checkpoint
     with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
         while update_count < num_parameter_updates:
             for _, x in enumerate(train_loader):
@@ -87,9 +95,17 @@ def train():
                 total_loss.backward()
                 optimizer.step()
 
+                # Checkpoint
+                if update_count % checkpoint_freq == 0:
+                    checkpoint_file_path = os.path.join(checkpoint_path, str(checkpoint + 1) + '.jpeg')
+                    test_output = transfer_network(test_image_tensor, 0)[0]
+                    save_tensor_as_image(test_output.detach().cpu(), checkpoint_file_path)
+                    checkpoint += 1
+
                 # Update tqdm bar
                 progress_bar.update(1)
-                progress_bar.set_postfix(style_loss="%.0f" % style_loss,
+                progress_bar.set_postfix(checkpoint=checkpoint,
+                                         style_loss="%.0f" % style_loss,
                                          content_loss="%.0f" % content_loss)
 
                 # Record loss in CSV file
