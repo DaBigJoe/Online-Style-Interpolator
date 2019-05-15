@@ -75,7 +75,7 @@ def train():
     stats_file.write(str(num_parameter_updates) + ', ' + str(style_num) + '\n')
     stats_file.write(style_manager.get_style_tensor_name(style_idxs[0]))
     for i in range(1, style_num):
-        stats_file.write(' ' + style_manager.get_style_tensor_name(style_idxs[0]))
+        stats_file.write(' ' + style_manager.get_style_tensor_name(style_idxs[i]))
     stats_file.write('\n')
     print('Saving stats to', stats_path)
 
