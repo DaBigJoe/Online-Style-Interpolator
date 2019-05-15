@@ -27,7 +27,7 @@ class Dataset(data.Dataset):
 
         self.style_images = []
         self.style_tensors = []
-        for style in listdir(style_dir):
+        for index, style in enumerate(listdir(style_dir)):
             style_image = load_image_as_tensor(style_dir + style).unsqueeze(0).to(self.device)
             style_tensor = loss_network.calculate_style_outputs(style_image)
 
@@ -38,6 +38,8 @@ class Dataset(data.Dataset):
 
             self.style_images.append(style_image.cpu())
             self.style_tensors.append(style_tensor)
+
+            print('STYLE: \'' + str(style) + '\' is index ' + str(index))
 
         self.loss_network = loss_network
 
@@ -63,7 +65,7 @@ class Dataset(data.Dataset):
         name = self.images[index]
 
         content_image = load_image_as_tensor(self.image_dir + name).to(self.device).detach()
-        content_tensor = self.loss_network.calculate_content_outputs(content_image.unsqueeze(0)).detach()
+        content_tensor = self.loss_network.calculate_content_outputs(content_image.unsqueeze(0))
 
         return content_tensor
 
