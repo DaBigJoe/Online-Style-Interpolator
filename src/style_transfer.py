@@ -2,12 +2,17 @@ import os
 import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from src.data_manager import Dataset, StyleManager
-from src.image_handler import load_image_as_tensor, normalise_batch
+from src.image_handler import normalise_batch
 from src.loss_network import LossNetwork
 from src.transfer_network import TransferNetwork
-from tqdm import tqdm
+
+
+def check_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 def train():
@@ -15,11 +20,22 @@ def train():
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     image_dir = '/home/data/train2014/'
     style_dir = '../data/images/style/'
+    checkpoint_dir = '../data/checkpoints/'
+    stats_dir = '../data/stats/'
     batch_size = 4
     num_parameter_updates = 100  # TODO change to parameter updates
     content_weight = 1e5
     style_weight = 1e10
     style_idxs = [0, 3]
+
+    # Ensure save directories exist
+    check_dir(checkpoint_dir)
+    check_dir(stats_dir)
+
+    # Get unique run id
+    unique_run_id = "{:04d}".format(len([i for i in os.listdir(checkpoint_dir)
+                                         if os.path.isdir(os.path.join(checkpoint_dir, i))]) + 1)
+    print('Starting run', unique_run_id)
 
     # Load dataset
     train_dataset = Dataset(image_dir)
@@ -37,6 +53,11 @@ def train():
 
     # Setup loss network
     loss_network = LossNetwork(normalise_batch(style_tensors), device)
+
+    # Setup logging
+    stats_path = stats_dir + 'stats' + unique_run_id + '.csv'
+    stats_file = open(stats_path, 'w+')
+    print('Saving stats to', stats_path)
 
     update_count = 0  # Number of parameter updates that have occurred
     with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
@@ -71,8 +92,14 @@ def train():
                 progress_bar.set_postfix(style_loss="%.0f" % style_loss,
                                          content_loss="%.0f" % content_loss)
 
+                # Record loss in CSV file
+                stats_file.write(str(update_count) + ', ' + str(style_loss.item()) + ', ' + str(content_loss.item()) + '\n')
+
                 # Step
                 update_count += 1
+
+    # Finish stats
+    stats_file.close()
 
 
 # def stylize(args):
