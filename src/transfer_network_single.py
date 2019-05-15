@@ -81,11 +81,11 @@ class TransferNetworkSingle(torch.nn.Module):
         self.norm3 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
 
         # Residual blocks
-        self.res1 = ResidualBlock(num_styles)
-        self.res2 = ResidualBlock(num_styles)
-        self.res3 = ResidualBlock(num_styles)
-        self.res4 = ResidualBlock(num_styles)
-        self.res5 = ResidualBlock(num_styles)
+        self.res1 = ResidualBlock(num_styles).cuda()
+        self.res2 = ResidualBlock(num_styles).cuda()
+        self.res3 = ResidualBlock(num_styles).cuda()
+        self.res4 = ResidualBlock(num_styles).cuda()
+        self.res5 = ResidualBlock(num_styles).cuda()
 
         # Upsampling Layers
         self.ups4 = torch.nn.Upsample(mode='nearest', scale_factor=2)
@@ -176,7 +176,7 @@ class TransferNetworkTrainerSingle:
 
         if not os.path.exists(stats_file_path):
             os.makedirs(stats_file_path)
-        self.stats_file = open(stats_file_path + 'stats' + str(num_previous_runs) + '.csv', 'w+')
+        self.stats_file = open(stats_file_path + 'stats' + str(num_previous_runs+1) + '.csv', 'w+')
 
     def train(self, num_parameter_updates=40000, num_checkpoints=9, num_styles=2):
         assert num_styles <= self.train_dataset.get_style_count()
@@ -188,7 +188,7 @@ class TransferNetworkTrainerSingle:
         checkpoint_freq = num_parameter_updates // num_checkpoints
 
         # Weight of style vs content
-        style_weight = 1e12
+        style_weight = 1e10
         content_weight = 1e5
 
         # Train
@@ -215,7 +215,13 @@ class TransferNetworkTrainerSingle:
                     style_loss, content_loss = self.loss_network.calculate_loss_with_precomputed(output, style_tensor, content_target)
                     style_loss = style_loss.mul(style_weight)
                     content_loss = content_loss.mul(content_weight)
+
+                    reg_loss = torch.sum(torch.abs(output[:, :, :, :-1] - output[:, :, :, 1:]))
+                    reg_loss += torch.sum(torch.abs(output[:, :, :-1, :] - output[:, :, 1:, :]))
+                    reg_loss = 1e-6 * reg_loss
+
                     loss = content_loss.add(style_loss)
+                    loss = loss.add(reg_loss.to(loss.device))
 
                     # Backprop (train) transfer network
                     loss.backward()
@@ -267,4 +273,4 @@ if __name__ == '__main__':
     test_image_path = '../data/images/content/venice.jpeg'
     stats_file_path = '../data/stats/'
     transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path, stats_file_path)
-    transfer_network.train()
+    transfer_network.train(num_checkpoints=1000, num_styles=5)

@@ -61,7 +61,7 @@ class LossNetwork:
         """
         Pass a tensor through the network and get the content outputs.
         """
-        return self.model(tensor)[2]
+        return self.model(tensor)[1]
 
     def calculate_image_loss(self, image_tensor, style_tensor, content_tensor):
         """
@@ -79,12 +79,13 @@ class LossNetwork:
         Calculate the style loss and content loss of an input image compared to the target style outputs and the
          target content outputs.
         """
+
         # Forward pass each image tensor and extract outputs
         predicted_outputs = self.model(image_tensor)
 
         # Compute and return style loss and content loss
         style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-        content_loss = self._content_loss(predicted_outputs[2], content_target_outputs)
+        content_loss = self._content_loss(predicted_outputs[1], content_target_outputs)
         return style_loss, content_loss
 
     def _style_loss(self, predicted_outputs, target_outputs):
