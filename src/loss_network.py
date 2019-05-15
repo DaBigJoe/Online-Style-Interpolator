@@ -87,19 +87,15 @@ class LossNetwork:
     # TODO refactor into style loss single
     def style_loss(self, y_features, style_idx):
         loss = 0.
-        for y_feature, style_gram in zip(y_features, self.style_grams):
-            y_gram = gram_matrix(y_feature)
-            loss += self.mse_loss(y_gram, style_gram[style_idx, :, :])
+        for layer_idx in range(len(y_features)):
+            loss += self.style_loss_single(y_features, style_idx, layer_idx)
         return loss
 
-    # def _style_loss_single(self, predicted_outputs, target_outputs):
-    #     losses = torch.zeros((len(predicted_outputs)))
-    #     target_gram = LossNetwork._gram_matrix(target_outputs[0])
-    #     for i in range(len(predicted_outputs)):
-    #         predicted_gram = LossNetwork._gram_matrix(predicted_outputs[i])
-    #         losses[i] = self.mse_loss(predicted_gram, target_gram)
-    #     loss = torch.mean(losses)
-    #     return loss
+    def style_loss_single(self, y_features, style_idx, layer_idx):
+        y_feature = y_features[layer_idx]
+        style_gram = self.style_grams[layer_idx]
+        y_gram = gram_matrix(y_feature)
+        return self.mse_loss(y_gram, style_gram[style_idx, :, :])
 
 
 def gram_matrix(batched_matrices):

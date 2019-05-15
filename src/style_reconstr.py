@@ -19,19 +19,22 @@ from torch import optim, randn
 from loss_network import LossNetwork
 from image_handler import save_tensor_as_image, plot_image_tensor, load_image_as_tensor, transform_256
 
-class StyleLearnerSingle():
+
+class StyleLearnerSingle:
+
     def __init__(self, layer_num, style_path, learn_rate, num_epochs):
         super(StyleLearnerSingle, self).__init__()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.learn_rate = learn_rate
+
+        self.layer_idx = layer_num
         self.style_path = style_path
-        self.layer = layer_num
+        self.learn_rate = learn_rate
         self.num_epochs = num_epochs
 
         # Load style as tensor
-        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to(self.device)
+        self.style_tensor = load_image_as_tensor(self.style_path).unsqueeze(0).to(self.device)
         # Load loss network
-        self.loss_network = LossNetwork()
+        self.loss_network = LossNetwork(self.style_tensor, self.device)
 
     def train(self):
         # 3 channel, 256^2px image
@@ -43,7 +46,7 @@ class StyleLearnerSingle():
         noise = torch.tensor(noise, requires_grad=True)
 
         optimiser = optim.Adam([noise], lr=self.learn_rate)
-        print("here i go training again!")
+        print("Here I go training again!")
 
         min_loss = 1e10 + 1
         min_noise = noise
@@ -55,28 +58,25 @@ class StyleLearnerSingle():
             with tqdm(range(self.num_epochs)) as progress_bar:
                 for _ in progress_bar:
                     optimiser.zero_grad()
-                    style_target_output = self.loss_network.model(self.style_tensor.cuda())
-                    noise_copy = noise
-                    predicted_output = self.loss_network.model(noise_copy)
-                    loss = self.loss_network.style_loss_single(predicted_output[self.layer],
-                                                               style_target_output[self.layer]) * 1e12
+                    noise_features = self.loss_network.model(noise)
+                    loss = self.loss_network.style_loss_single(noise_features, 0, self.layer_idx) * 1e12
+
                     # Backprop step
                     loss.backward()
                     optimiser.step()
                     loss_str = "%.5f" % loss
                     progress_bar.set_postfix(error=loss_str)
 
-                    if(loss < min_loss):
+                    if loss < min_loss:
                         min_loss = loss
-                        min_noise = noise_copy.clone()
+                        min_noise = noise.clone()
 
-                        # print("Epoch %d, loss %4.8f" % (epoch, loss))
         except KeyboardInterrupt:
             print('interrupted, wait for save dialogue')
             interrupt_flag = True
         finally:
-            save_directory = "../data/images/style_analysis/" + str(self.layer)
-            print("final loss for this run is:", str(min_loss.item()))
+            save_directory = "../data/images/style_analysis/" + str(self.layer_idx)
+            print("Final loss for this run is:", str(min_loss.item()))
             input_image = min_noise.detach()
 
             # Save image
@@ -90,27 +90,28 @@ class StyleLearnerSingle():
             save_tensor_as_image(input_image, file_path)
 
             # Check if finally is invoked by interrupt
-            if (interrupt_flag):
+            if interrupt_flag:
                 exit(0)
 
 
-class StyleLearnerCumulative():
-    def __init__(self, layer_num, style_path, learn_rate, num_epochs):
+class StyleLearnerCumulative:
+
+    def __init__(self, layer_idx, style_path, learn_rate, num_epochs):
         super(StyleLearnerCumulative, self).__init__()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.learn_rate = learn_rate
+        self.layer_idx = layer_idx
         self.style_path = style_path
-        self.layer = layer_num
+        self.learn_rate = learn_rate
         self.num_epochs = num_epochs
         self.plots = []
 
-        for i in range(layer_num + 2):
+        for i in range(layer_idx + 2):
             self.plots.append([])
 
         # Load style as tensor
-        self.style_tensor = load_image_as_tensor(self.style_path, transform=transform_256).to(self.device)
+        self.style_tensor = load_image_as_tensor(self.style_path).unsqueeze(0).to(self.device)
         # Load loss network
-        self.loss_network = LossNetwork()
+        self.loss_network = LossNetwork(self.style_tensor, self.device)
 
     def train(self):
         # 3 channel, 256^2px image
@@ -122,8 +123,7 @@ class StyleLearnerCumulative():
         noise = torch.tensor(noise, requires_grad=True)
 
         optimiser = optim.Adam([noise], lr=self.learn_rate)
-
-        print("here i go training again!")
+        print("Here i go training again!")
 
         min_loss = 1e10 + 1
         min_noise = noise
@@ -140,16 +140,18 @@ class StyleLearnerCumulative():
                     noise_copy = noise
                     predicted_output = self.loss_network.model(noise_copy)
 
+                    optimiser.zero_grad()
+                    noise_features = self.loss_network.model(noise)
+
                     loss = 0
                     # Add loss of style layers, and store for plotting
-                    for x_i in range(self.layer + 1):
-                        layer_loss = self.loss_network.style_loss_single(predicted_output[x_i],
-                                                            style_target_output[x_i]) * 1e12
+                    for x_i in range(self.layer_idx + 1):
+                        layer_loss = self.loss_network.style_loss_single(noise_features, 0, x_i) * 1e12
                         self.plots[x_i].append(layer_loss.item())
                         loss += layer_loss
 
                     # And add cumulative loss
-                    self.plots[self.layer + 1].append(loss.item())
+                    self.plots[self.layer_idx + 1].append(loss.item())
 
                     # Backprop step
                     loss.backward()
@@ -157,14 +159,15 @@ class StyleLearnerCumulative():
                     loss_str = "%.5f" % loss
                     progress_bar.set_postfix(error=loss_str)
 
-                    if (loss < min_loss):
+                    if loss < min_loss:
                         min_loss = loss
                         min_noise = noise_copy.clone()
+
         except KeyboardInterrupt:
             print('interrupted, wait for save dialogue')
             interrupt_flag = True
         finally:
-            save_directory = "../data/images/style_analysis/" + str(self.layer)
+            save_directory = "../data/images/style_analysis/" + str(self.layer_idx)
             print("final loss for this run is:", str(min_loss.item()))
             input_image = min_noise.detach()
 
@@ -175,22 +178,23 @@ class StyleLearnerCumulative():
             file_name_pre = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
             file_name_post = '-loss-' + str(min_loss.item())
             file_name = file_name_pre + file_name_post + '.jpg'
-            csv_name = file_name_pre + '-' + str(self.layer) + '.csv'
+            csv_name = file_name_pre + '-' + str(self.layer_idx) + '.csv'
 
             file_path = os.path.join(save_directory, file_name)
             csv_path = os.path.join(save_directory, csv_name)
 
-            print("writing image")
+            print("Writing image")
             save_tensor_as_image(input_image, file_path)
 
-            print("writing csv")
+            print("Writing csv")
             with open(csv_path, "w+") as f:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows(self.plots)
 
             # Check if finally is invoked by interrupt
-            if(interrupt_flag):
+            if interrupt_flag:
                 exit(0)
+
 
 if __name__ == '__main__':
     style_path = '../data/images/style/Van_Gogh_Starry_Night.jpg'
@@ -201,7 +205,7 @@ if __name__ == '__main__':
     # learn_rates = [0.1, 0.1, 0.1, 0.1]
 
     for i in range(5):
-        if(i != 3):
+        if i != 3:
             continue
 
         print("i =", i)
