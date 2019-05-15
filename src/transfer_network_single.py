@@ -141,15 +141,23 @@ class TransferNetworkTrainerSingle:
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
 
+        network_parameter_dir = '../data/networks/model_parameters'
+        if not os.path.exists(network_parameter_dir):
+            os.makedirs(network_parameter_dir)
+        self.model_save_path = os.path.join(network_parameter_dir, "{:04d}".format(num_previous_runs+1))
+        print(' Model path: ', self.model_save_path)
+
         self.stats_file = open(stats_file_path, 'w+')
 
-    def train(self, num_parameter_updates=40000, num_checkpoints=1000):
+    def train(self, num_parameter_updates=40000, num_checkpoints=9, num_styles=2):
+        assert num_styles <= self.train_dataset.get_style_count()
         num_styles = self.train_dataset.get_style_count()
 
         print('Training single transfer network')
+        print(' Using', num_styles, 'styles')
         model = TransferNetworkSingle(num_styles).to(self.device)
         optimiser = optim.Adam(model.parameters(), lr=1e-3)
-        checkpoint_freq = num_checkpoints
+        checkpoint_freq = num_parameter_updates // num_checkpoints
 
         # Weight of style vs content
         style_weight = 1e12
@@ -158,23 +166,22 @@ class TransferNetworkTrainerSingle:
         # Train
         checkpoint = 0
         update_count = 0
-        style_count = 0
         with tqdm(total=num_parameter_updates, ncols=120) as progress_bar:
             checkpoint_tensors = []
             while update_count < num_parameter_updates:
-
                 for batch_num, (image_tensors, content_target) in enumerate(self.train_loader):
                     if update_count >= num_parameter_updates:
                         break
 
+                    current_style_idx = update_count % num_styles
                     optimiser.zero_grad()
 
                     # Style tensor
-                    style_tensor = self.train_dataset.get_style_tensor(style_count % num_styles)
+                    style_tensor = self.train_dataset.get_style_tensor(current_style_idx)
 
                     # Pass through transfer network
                     image_tensors = image_tensors.to(self.device)
-                    output = model(image_tensors, style_count % num_styles)
+                    output = model(image_tensors, current_style_idx)
 
                     # Calculate loss
                     style_loss, content_loss = self.loss_network.calculate_loss_with_precomputed(output, style_tensor, content_target)
@@ -195,7 +202,7 @@ class TransferNetworkTrainerSingle:
                     # Checkpoint
                     if update_count % checkpoint_freq == 0:
                         checkpoint_file_path = os.path.join(self.save_directory, str(checkpoint+1) + '.jpeg')
-                        test_output = model(self.test_image_tensor, style_count % num_styles)
+                        test_output = model(self.test_image_tensor, 0)
                         checkpoint_tensors.append(test_output)
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
@@ -205,28 +212,24 @@ class TransferNetworkTrainerSingle:
                     update_count += 1
                     progress_bar.update(1)
 
-                    style_count += 1
-
         self.stats_file.close()
-        torch.save(model.state_dict(), '/home/stonarda/uni/deep_learning/updated_model.pt')
+        torch.save(model.state_dict(), self.model_save_path)
 
         # Save image
         final_output = model(self.test_image_tensor, 0)
         checkpoint_tensors.append(self.test_image_tensor)
-        checkpoint_tensors.append(self.style_tensor)
+        checkpoint_tensors.append(self.train_dataset.get_style_tensor(0))
         checkpoint_tensors.append(final_output)
 
         final_file_path = os.path.join(self.save_directory, 'final.jpeg')
-        #save_tensor_as_image(final_output, final_file_path)
+        save_tensor_as_image(final_output, final_file_path)
 
         grid_file_path = os.path.join(self.save_directory, 'grid.jpeg')
-        #save_tensors_as_grid(checkpoint_tensors, grid_file_path, 5)
+        save_tensors_as_grid(checkpoint_tensors, grid_file_path, 5)
 
         # Show images (requires reload)
         #plot_image_tensor(load_image_as_tensor(final_file_path))
         #plot_image_tensor(load_image_as_tensor(grid_file_path, transform=transforms.ToTensor()))
-
-        print('DONE')
 
 
 if __name__ == '__main__':
