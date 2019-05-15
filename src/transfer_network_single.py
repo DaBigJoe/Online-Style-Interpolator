@@ -137,6 +137,35 @@ class TransferNetworkSingle(torch.nn.Module):
 
         return y
 
+    def get_all_conditional_norms(self):
+        conditional_norms = [self.norm1, self.norm2, self.norm3,
+                             self.res1.norm1, self.res1.norm2,
+                             self.res2.norm1, self.res2.norm2,
+                             self.res3.norm1, self.res3.norm2,
+                             self.res4.norm1, self.res4.norm2,
+                             self.res5.norm1, self.res5.norm2,
+                             self.norm4, self.norm5]
+        return conditional_norms
+
+    def get_style_parameters(self, style_idx):
+        conditional_norms = self.get_all_conditional_norms()
+        weight_tensors = []
+        bias_tensors = []
+        for conditional_norm in conditional_norms:
+            weight_tensors.append(conditional_norm.norm2ds[style_idx].weight)
+            bias_tensors.append(conditional_norm.norm2ds[style_idx].bias)
+        return weight_tensors, bias_tensors
+
+    def set_style_parameters(self, style_parameters, style_idx):
+        """
+        Load a set of style parameters into a particular style slice.
+        """
+        conditional_norms = self.get_all_conditional_norms()
+        weight_tensors, bias_tensors = style_parameters
+        for i in range(len(conditional_norms)):
+            conditional_norms[i].norm2ds[style_idx].weight.data = weight_tensors[i]
+            conditional_norms[i].norm2ds[style_idx].bias.data = bias_tensors[i]
+
 
 class TransferNetworkTrainerSingle:
 
@@ -268,9 +297,9 @@ class TransferNetworkTrainerSingle:
 
 if __name__ == '__main__':
     style_dir = '../data/images/style/'
-    content_dir = '../data/coco/'
+    content_dir = '/home/data/train2014/'
     save_path = '../data/checkpoints/'
     test_image_path = '../data/images/content/venice.jpeg'
     stats_file_path = '../data/stats/'
     transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path, stats_file_path)
-    transfer_network.train(num_checkpoints=1000, num_styles=5)
+    transfer_network.train(num_parameter_updates=10000, num_checkpoints=100, num_styles=2)
