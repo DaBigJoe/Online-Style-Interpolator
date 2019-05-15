@@ -1,7 +1,7 @@
 import torch
 
 from image_handler import load_image_as_tensor, transform_256, save_tensors_as_grid, plot_image_tensor
-from transfer_network_single import TransferNetworkSingle
+from transfer_network import TransferNetwork
 from torchvision import transforms
 import os
 
@@ -11,7 +11,7 @@ class TwoStyleInterpolator:
     def __init__(self, total_num_styles, network_parameter_path, device):
         print("Setting up interpolator")
         print(" Using network parameters from", network_parameter_path)
-        self.transfer_network = TransferNetworkSingle(total_num_styles)
+        self.transfer_network = TransferNetwork(total_num_styles)
         self.transfer_network.load_state_dict(torch.load(network_parameter_path))
         self.transfer_network.to(device).eval()
         print(" Ready")
@@ -63,7 +63,7 @@ class TwoStyleInterpolator:
 
 if __name__ == '__main__':
     _device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    _run_id = '0009'
+    _run_id = '0002'
 
     _test_image_tensor = load_image_as_tensor('../data/images/content/venice.jpeg', transform=transform_256)
     _test_image_tensor = _test_image_tensor.unsqueeze(0).to(_device)
