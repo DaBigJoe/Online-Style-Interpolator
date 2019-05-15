@@ -84,7 +84,6 @@ class LossNetwork:
         """
         return self.mse_loss(x_features.relu2_2, y_features.relu2_2)
 
-    # TODO refactor into style loss single
     def style_loss(self, y_features, style_idx):
         loss = 0.
         for layer_idx in range(len(y_features)):
