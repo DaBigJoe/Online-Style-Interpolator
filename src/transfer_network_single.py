@@ -174,11 +174,12 @@ class TransferNetworkTrainerSingle:
         self.model_save_path = os.path.join(network_parameter_dir, "{:04d}".format(num_previous_runs+1))
         print(' Model path: ', self.model_save_path)
 
-        self.stats_file = open(stats_file_path + str(num_previous_runs) + '.csv', 'w+')
+        if not os.path.exists(stats_file_path):
+            os.makedirs(stats_file_path)
+        self.stats_file = open(stats_file_path + 'stats' + str(num_previous_runs) + '.csv', 'w+')
 
-    def train(self, num_parameter_updates=40000, num_checkpoints=1000, num_styles=2):
+    def train(self, num_parameter_updates=40000, num_checkpoints=9, num_styles=2):
         assert num_styles <= self.train_dataset.get_style_count()
-        num_styles = self.train_dataset.get_style_count()
 
         print('Training single transfer network')
         print(' Using', num_styles, 'styles')
@@ -264,6 +265,6 @@ if __name__ == '__main__':
     content_dir = '../data/coco/'
     save_path = '../data/checkpoints/'
     test_image_path = '../data/images/content/venice.jpeg'
-    stats_file_path = '../stats_file'
+    stats_file_path = '../data/stats/'
     transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path, stats_file_path)
     transfer_network.train()
