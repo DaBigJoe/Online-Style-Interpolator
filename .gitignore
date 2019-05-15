@@ -2,7 +2,6 @@
 */__pycache__/*
 data/images/produced
 data/checkpoints
-data/networks/model_parameters
 data/interpolation
 data/stats
 data/rendered
