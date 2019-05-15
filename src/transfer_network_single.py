@@ -113,7 +113,7 @@ class TransferNetworkSingle(torch.nn.Module):
 
 class TransferNetworkTrainerSingle:
 
-    def __init__(self, content_dir, style_dir, save_directory, test_image_path):
+    def __init__(self, content_dir, style_dir, save_directory, test_image_path, stats_file_path):
         print('Creating single transfer network')
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -147,8 +147,11 @@ class TransferNetworkTrainerSingle:
         self.model_save_path = os.path.join(network_parameter_dir, "{:04d}".format(num_previous_runs+1))
         print(' Model path: ', self.model_save_path)
 
+        self.stats_file = open(stats_file_path + str(num_previous_runs) + '.csv', 'w+')
+
     def train(self, num_parameter_updates=40000, num_checkpoints=9, num_styles=2):
         assert num_styles <= self.train_dataset.get_style_count()
+        num_styles = self.train_dataset.get_style_count()
 
         print('Training single transfer network')
         print(' Using', num_styles, 'styles')
@@ -204,9 +207,12 @@ class TransferNetworkTrainerSingle:
                         save_tensor_as_image(test_output, checkpoint_file_path)
                         checkpoint += 1
 
+                    self.stats_file.write(str(update_count) + ', ' + str(style_loss.item()) + ', ' + str(content_loss.item()) + '\n')
+
                     update_count += 1
                     progress_bar.update(1)
 
+        self.stats_file.close()
         torch.save(model.state_dict(), self.model_save_path)
 
         # Save image
@@ -228,8 +234,9 @@ class TransferNetworkTrainerSingle:
 
 if __name__ == '__main__':
     style_dir = '../data/images/style/'
-    content_dir = '/home/data/train2014/'
+    content_dir = '../data/coco/'
     save_path = '../data/checkpoints/'
     test_image_path = '../data/images/content/venice.jpeg'
-    transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path)
-    transfer_network.train(num_parameter_updates=20000, num_styles=2)
+    stats_file_path = '../stats_file'
+    transfer_network = TransferNetworkTrainerSingle(content_dir, style_dir, save_path, test_image_path, stats_file_path)
+    transfer_network.train()
