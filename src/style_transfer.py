@@ -4,10 +4,10 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.data_manager import Dataset, StyleManager
-from src.image_handler import normalise_batch, load_image_as_tensor, save_tensor_as_image
-from src.loss_network import LossNetwork
-from src.transfer_network import TransferNetwork
+from data_manager import Dataset, StyleManager
+from image_handler import normalise_batch, load_image_as_tensor, save_tensor_as_image
+from loss_network import LossNetwork
+from transfer_network import TransferNetwork
 
 
 def check_dir(path):
@@ -25,11 +25,11 @@ def train():
     model_dir = '../data/networks/model_parameters'
     test_image_path = '../data/images/content/venice.jpeg'
     batch_size = 4
-    num_parameter_updates = 100  # TODO change to parameter updates
+    num_parameter_updates = 10000
     content_weight = 1e5
     style_weight = 1e10
     style_idxs = [0, 3]
-    checkpoint_freq = 10
+    checkpoint_freq = 100
 
     # Ensure save directories exist
     check_dir(checkpoint_dir)
