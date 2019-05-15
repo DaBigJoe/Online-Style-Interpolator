@@ -51,6 +51,9 @@ class StyleManager(data.Dataset):
     def get_style_tensors(self):
         return self.get_style_tensors()
 
+    def get_style_tensor_name(self, idx):
+        return self.styles[idx]
+
     def get_style_tensor_subset(self, idxs):
         subset = []
         for idx in idxs:

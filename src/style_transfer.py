@@ -72,6 +72,11 @@ def train():
     # Setup logging
     stats_path = stats_dir + 'stats' + unique_run_id + '.csv'
     stats_file = open(stats_path, 'w+')
+    stats_file.write(str(num_parameter_updates) + ', ' + str(style_num) + '\n')
+    stats_file.write(style_manager.get_style_tensor_name(style_idxs[0]))
+    for i in range(1, style_num):
+        stats_file.write(' ' + style_manager.get_style_tensor_name(style_idxs[0]))
+    stats_file.write('\n')
     print('Saving stats to', stats_path)
 
     update_count = 0  # Number of parameter updates that have occurred
