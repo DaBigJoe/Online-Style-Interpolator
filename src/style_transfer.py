@@ -3,11 +3,12 @@ import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from src.data_manager import Dataset
+from src.data_manager import Dataset, StyleManager
 from src.image_handler import load_image_as_tensor, normalise_batch
 from src.loss_network import LossNetwork
 from src.transfer_network import TransferNetwork
 from tqdm import tqdm
+
 
 def train():
     # Args
@@ -18,20 +19,16 @@ def train():
     num_parameter_updates = 100  # TODO change to parameter updates
     content_weight = 1e5
     style_weight = 1e10
+    style_idxs = [0, 3]
 
     # Load dataset
     train_dataset = Dataset(image_dir)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)  # to provide a batch loader
 
     # Load styles
-    style_names = [f for f in os.listdir(style_dir)]
-    style_num = len(style_names)
-    print('Found', style_num, 'styles')
-    style_tensors = []
-    for style_name in style_names:
-        style = load_image_as_tensor(style_dir + style_name)
-        style_tensors.append(style)
-    style_tensors = torch.stack(style_tensors).to(device)
+    style_manager = StyleManager(style_dir, device)
+    style_tensors = style_manager.get_style_tensor_subset(style_idxs)
+    style_num = len(style_idxs)
 
     # Setup transfer network
     transfer_network = TransferNetwork(style_num).to(device)
