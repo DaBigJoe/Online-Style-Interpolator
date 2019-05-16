@@ -19,60 +19,49 @@ class Dataset(data.Dataset):
     A Dataset for loading the data used to train the network
     """
 
-    def __init__(self, image_dir,  style_dir, loss_network):
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
+    def __init__(self, image_dir):
         self.image_dir = image_dir
         self.images = listdir(image_dir)
 
-        self.style_images = []
-        self.style_tensors = []
-        for index, style in enumerate(listdir(style_dir)):
-            style_image = load_image_as_tensor(style_dir + style).unsqueeze(0).to(self.device)
-            style_tensor = loss_network.calculate_style_outputs(style_image)
-
-            _style_tensor = []
-            for st in style_tensor:
-                _style_tensor.append(st.detach())
-            style_tensor = _style_tensor
-
-            self.style_images.append(style_image.cpu())
-            self.style_tensors.append(style_tensor)
-
-            print('STYLE: \'' + str(style) + '\' is index ' + str(index))
-
-        self.loss_network = loss_network
-
-        print('Dataset Loaded, Found: ' + str(len(self.style_images)) + ' style images and ' + str(len(self.images)) + ' content tensors')
-
-    def get_style_count(self):
-        return len(self.style_images)
-
-    def get_style_image(self, index):
-        return self.style_images[index]
-
-    def get_style_tensor(self, index):
-        return self.style_tensors[index]
-
-    def get_image_count(self):
-        return len(self.images)
-
     def get_image_tensor(self, index):
-        image = load_image_as_tensor(self.image_dir + self.images[index])
-        return image
-
-    def get_content_tensor(self, index):
-        name = self.images[index]
-
-        content_image = load_image_as_tensor(self.image_dir + name).to(self.device).detach()
-        content_tensor = self.loss_network.calculate_content_outputs(content_image.unsqueeze(0))
-
-        return content_tensor
+        return load_image_as_tensor(self.image_dir + self.images[index])
 
     def __len__(self):
-        return self.get_image_count()
+        return len(self.images)
 
     def __getitem__(self, index):
-        image_tensor = self.get_image_tensor(index)
-        content_tensor = self.get_content_tensor(index)
-        return image_tensor, content_tensor
+        return self.get_image_tensor(index)
+
+
+class StyleManager(data.Dataset):
+
+    def __init__(self, style_dir, device):
+        self.style_dir = style_dir
+        self.device = device
+        self.styles = sorted(listdir(style_dir))
+        print('Found', len(self.styles), 'styles:')
+        for i, s in enumerate(self.styles):
+            print(' Style', i, '=', s)
+
+        style_tensors = []
+        for style in self.styles:
+            style_tensors.append(load_image_as_tensor(style_dir + style))
+        self.style_tensors = torch.stack(style_tensors).to(device)
+
+    def get_style_tensors(self):
+        return self.get_style_tensors()
+
+    def get_style_tensor_name(self, idx):
+        return self.styles[idx]
+
+    def get_style_tensor_subset(self, idxs):
+        subset = []
+        for idx in idxs:
+            subset.append(self.style_tensors[idx])
+        return torch.stack(subset).to(self.device)
+
+    def __len__(self):
+        return len(self.style_tensors)
+
+    def __getitem__(self, index):
+        return self.style_tensors[index]

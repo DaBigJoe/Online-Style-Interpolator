@@ -11,6 +11,7 @@ Created: 17/04/19
 import torch
 from torch import nn
 from torchvision.models import vgg16
+from collections import namedtuple
 
 
 class TruncatedVgg16(torch.nn.Module):
@@ -22,21 +23,34 @@ class TruncatedVgg16(torch.nn.Module):
 
     def __init__(self):
         super(TruncatedVgg16, self).__init__()
-        # relu2_2 (8) for content
-        # relu1_2 (3), relu2_2 (8), relu3_3 (15) and relu4_3 (22) for style
-        self.target_layers = [3, 8, 15, 22]
-        features = list(vgg16(pretrained=True).features)[:self.target_layers[-1] + 1]
-        self.features = nn.ModuleList(features).eval()
-        # print(self.features)
+        vgg_pretrained_features = vgg16(pretrained=True).features
+        self.slice1 = torch.nn.Sequential()
+        self.slice2 = torch.nn.Sequential()
+        self.slice3 = torch.nn.Sequential()
+        self.slice4 = torch.nn.Sequential()
+        for x in range(4):
+            self.slice1.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(4, 9):
+            self.slice2.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(9, 16):
+            self.slice3.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(16, 23):
+            self.slice4.add_module(str(x), vgg_pretrained_features[x])
+        for param in self.parameters():
+            param.requires_grad = False
 
-    def forward(self, x):
-        outputs = []
-        # Pass input through the network and grab the outputs of the layers we need.
-        for layer_index, feature in enumerate(self.features):
-            x = feature(x)
-            if layer_index in self.target_layers:
-                outputs.append(x)
-        return outputs
+    def forward(self, X):
+        h = self.slice1(X)
+        h_relu1_2 = h
+        h = self.slice2(h)
+        h_relu2_2 = h
+        h = self.slice3(h)
+        h_relu3_3 = h
+        h = self.slice4(h)
+        h_relu4_3 = h
+        vgg_outputs = namedtuple("VggOutputs", ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
+        out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3)
+        return out
 
 
 class LossNetwork:
@@ -44,84 +58,54 @@ class LossNetwork:
     A wrapper around the truncated Vgg16 network provided computation of the style and content loss functions.
     """
 
-    def __init__(self):
-        self.model = TruncatedVgg16().to("cuda:0" if torch.cuda.is_available() else "cpu")
+    def __init__(self, style_tensors, device):
+        self.model = TruncatedVgg16().to(device)
         self.model.eval()
-        for p in self.model.parameters():
-            p.require_grads = False
         self.mse_loss = torch.nn.MSELoss()
 
-    def calculate_style_outputs(self, tensor):
-        """
-        Pass a tensor through the network and get the style outputs.
-        """
-        return self.model(tensor)
+        # Pre-compute style features
+        style_features = self.model(style_tensors)
+        self.style_grams = [gram_matrix(y) for y in style_features]
 
-    def calculate_content_outputs(self, tensor):
-        """
-        Pass a tensor through the network and get the content outputs.
-        """
-        return self.model(tensor)[1]
-
-    def calculate_image_loss(self, image_tensor, style_tensor, content_tensor):
+    def calculate_loss(self, batched_x, batched_y, style_idx):
         """
         Calculate the style loss and content loss of an input image compared to a target style image and a
          target content image.
         """
-        # Forward pass each image tensor and extract outputs
-        style_target_outputs = self.calculate_style_outputs(style_tensor)
-        content_target_outputs = self.calculate_content_outputs(content_tensor.cuda())
+        x_features = self.model(batched_x)
+        y_features = self.model(batched_y)
+        content_loss = self.content_loss(x_features, y_features)
+        style_loss = self.style_loss(y_features, style_idx)
+        return content_loss, style_loss
 
-        return self.calculate_loss_with_precomputed(image_tensor, style_target_outputs, content_target_outputs)
-
-    def calculate_loss_with_precomputed(self, image_tensor, style_target_outputs, content_target_outputs):
-        """
-        Calculate the style loss and content loss of an input image compared to the target style outputs and the
-         target content outputs.
-        """
-
-        # Forward pass each image tensor and extract outputs
-        predicted_outputs = self.model(image_tensor)
-
-        # Compute and return style loss and content loss
-        style_loss = self._style_loss(predicted_outputs, style_target_outputs)
-        content_loss = self._content_loss(predicted_outputs[1], content_target_outputs)
-        return style_loss, content_loss
-
-    def _style_loss(self, predicted_outputs, target_outputs):
-        """
-        Calculate the style loss between a set of predicted outputs and a set of target style outputs.
-        """
-        # Sum over all of the target outputs
-        loss = 0
-        for i in range(len(target_outputs)):
-            loss += self._style_loss_single(predicted_outputs[i], target_outputs[i])
-        return loss
-
-    def _content_loss(self, predicted_outputs, target_outputs):
+    def content_loss(self, x_features, y_features):
         """
         Calculate the content loss between a set of predicted outputs and a set of target content outputs.
         """
-        losses = torch.zeros((len(predicted_outputs)))
-        target_output = target_outputs[0]
-        for i in range(len(predicted_outputs)):
-            losses[i] = self.mse_loss(target_output, predicted_outputs[i])
-        loss = torch.mean(losses)
+        return self.mse_loss(x_features.relu2_2, y_features.relu2_2)
+
+    def style_loss(self, y_features, style_idx):
+        loss = 0.
+        for layer_idx in range(len(y_features)):
+            loss += self.style_loss_single(y_features, style_idx, layer_idx)
         return loss
 
-    def _style_loss_single(self, predicted_outputs, target_outputs):
-        losses = torch.zeros((len(predicted_outputs)))
-        target_gram = LossNetwork._gram_matrix(target_outputs[0])
-        for i in range(len(predicted_outputs)):
-            predicted_gram = LossNetwork._gram_matrix(predicted_outputs[i])
-            losses[i] = self.mse_loss(predicted_gram, target_gram)
-        loss = torch.mean(losses)
-        return loss
+    def style_loss_single(self, y_features, style_idx, layer_idx):
+        y_feature = y_features[layer_idx]
+        style_gram = self.style_grams[layer_idx]
+        y_gram = gram_matrix(y_feature)
+        return self.mse_loss(y_gram, style_gram[style_idx, :, :])
 
-    @staticmethod
-    def _gram_matrix(m):
-        # Reshape target outs from c x h x w to c x hw
-        shape = torch.tensor(m.shape)
-        m1 = m.reshape([shape[0], shape[1] * shape[2]])
-        # Calculate gram matrix
-        return m1.mm(m1.t()).div(shape.prod())
+
+def gram_matrix(batched_matrices):
+    batch, channel, height, width = batched_matrices.size()
+    # Reshape target outs from b x c x h x w to b x c x hw
+    m1 = batched_matrices.view(batch, channel, width * height)
+    m1_t = m1.transpose(1, 2)  # Ignore batch dim when transposing
+    # Actually compute gram matrix
+    p = channel * height * width
+    mul_mats = []
+    for i in range(batch):
+        mul_mats.append(m1[i].mm(m1_t[i]))
+    gram_m = torch.stack(mul_mats) / p
+    return gram_m
