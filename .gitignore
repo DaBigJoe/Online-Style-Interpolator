@@ -2,6 +2,4 @@
 */__pycache__/*
 data/images/produced
 data/checkpoints
-data/interpolation
 data/stats
-data/rendered
