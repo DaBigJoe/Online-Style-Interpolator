@@ -23,7 +23,10 @@ class CsvViewer:
             for idx, second_row in enumerate(read_csv):
                 self.styles = []
                 for i in range(self.style_num):
-                    self.styles.append(second_row[i])
+                    style = second_row[i]
+                    print('IDX ' + str(i) + ', STYLE ' + str(style))
+
+                    self.styles.append(style)
                 break
 
             # For data points
@@ -32,8 +35,6 @@ class CsvViewer:
             row_contents = []
 
             for idx, row_raw in enumerate(read_csv):
-                print(row_raw)
-
                 if (not (idx % self.style_num)) and (not (0 == idx)):
                     _row = np.array([idx])
                     _row_styles = np.array(row_styles)
@@ -103,5 +104,5 @@ class CsvViewer:
         plt.legend()
         plt.show()
 
-cv = CsvViewer('../data/stats/stats2.csv')
-cv.plot_individual_data()
+cv = CsvViewer('../data/stats/stats0001.csv')
+cv.plot_total_data()
