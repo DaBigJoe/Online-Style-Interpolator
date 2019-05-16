@@ -2,7 +2,7 @@
 Image helper functions.
 
 Author: Joseph Early (je5g15@soton.ac.uk)
-Created: 17/05/19
+Created: 17/04/19
 """
 
 import matplotlib.pyplot as plt
