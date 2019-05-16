@@ -58,7 +58,8 @@ def save_tensors_as_grid(tensors, image_path, nrow, cwidth=256, cheight=256):
     reshaped_tensors = []
     for tensor in tensors:
         reshaped_tensors.append(tensor.view((3, cwidth, cheight)))
-    torchvision.utils.save_image(reshaped_tensors, image_path, nrow=nrow, padding=10, normalize=True, scale_each=True)
+    torchvision.utils.save_image(reshaped_tensors, image_path, nrow=nrow, padding=10, normalize=True,
+                                 scale_each=True, pad_value=255)
 
 
 def plot_image_tensor(image_tensor):

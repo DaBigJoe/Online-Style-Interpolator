@@ -94,7 +94,8 @@ class FourStyleInterpolator(Interpolator):
             output_images.append(self.render_interpolated_image(interpolated_style_parameters, test_image_tensor))
 
         # Insert style images
-        black_image = torch.zeros([3, 256, 256]).to(_device)
+        white_image = torch.ones([3, 256, 256]).mul(255).to(_device)
+        print(white_image)
         grid = []
         for y in range(grid_dim):
             for x in range(grid_dim + 2):
@@ -104,14 +105,14 @@ class FourStyleInterpolator(Interpolator):
                     elif y == (grid_dim - 1):
                         grid.append(style_tensors[3])
                     else:
-                        grid.append(black_image)
+                        grid.append(white_image)
                 elif x == grid_dim + 1:
                     if y == 0:
                         grid.append(style_tensors[1])
                     elif y == (grid_dim - 1):
                         grid.append(style_tensors[2])
                     else:
-                        grid.append(black_image)
+                        grid.append(white_image)
                 else:
                     grid.append(output_images[(x - 1) + y * grid_dim])
 
