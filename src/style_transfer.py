@@ -18,14 +18,14 @@ def check_dir(path):
 def train():
     # Args
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    image_dir = '/home/data/train2014/'
+    image_dir = '../data/coco/'
     style_dir = '../data/images/style/'
     checkpoint_dir = '../data/checkpoints/'
     stats_dir = '../data/stats/'
     model_dir = '../data/networks/model_parameters'
     test_image_path = '../data/images/content/venice.jpeg'
     batch_size = 4
-    num_parameter_updates = 40000
+    num_parameter_updates = 10000
     content_weight = 1e5
     style_weight = 1e10
     style_idxs = [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
@@ -73,9 +73,9 @@ def train():
     stats_path = stats_dir + 'stats' + unique_run_id + '.csv'
     stats_file = open(stats_path, 'w+')
     stats_file.write(str(num_parameter_updates) + ', ' + str(style_num) + '\n')
-    stats_file.write(style_manager.get_style_tensor_name(style_idxs[0]))
+    stats_file.write(style_manager.get_style_tensor_name(style_idxs[0]).replace(',', ''))
     for i in range(1, style_num):
-        stats_file.write(' ' + style_manager.get_style_tensor_name(style_idxs[0]))
+        stats_file.write(', ' + style_manager.get_style_tensor_name(style_idxs[i]).replace(',', ''))
     stats_file.write('\n')
     print('Saving stats to', stats_path)
 
