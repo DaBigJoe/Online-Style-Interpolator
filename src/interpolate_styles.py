@@ -6,7 +6,7 @@ from torchvision import transforms
 import os
 from abc import ABC
 from torch.nn import Softmax
-
+from data_manager import StyleManager
 
 class Interpolator(ABC):
 
@@ -69,7 +69,6 @@ class FourStyleInterpolator(Interpolator):
                 d = 1.0 if d == 0.0 else 1.0/d
             return d
 
-
         interpolated_style_parameters_list = []
         for y in range(grid_dim):
             for x in range(grid_dim):
@@ -78,7 +77,6 @@ class FourStyleInterpolator(Interpolator):
                 dist_c = dist(x, y, grid_dim - 1, grid_dim - 1)  # C in lower right
                 dist_d = dist(x, y, 0, grid_dim - 1)             # D in lower left
                 distances = [dist_a, dist_b, dist_c, dist_d]
-                print(x, y, '-', distances)
                 interpolated_style_parameters = self.interpolate(style_parameters_a, style_parameters_b,
                                                                  style_parameters_c, style_parameters_d,
                                                                  distances)
@@ -86,17 +84,44 @@ class FourStyleInterpolator(Interpolator):
 
         return interpolated_style_parameters_list
 
-    def produce_interpolated_grid(self, interpolated_style_parameters_list, test_image_tensor, run_id, grid_dim=5):
+    def produce_interpolated_grid(self, style_tensors, interpolated_style_parameters_list,
+                                  test_image_tensor, run_id, grid_dim=5):
         print('Rendering images into grid')
+
+        # Load interpolated images
         output_images = []
         for interpolated_style_parameters in interpolated_style_parameters_list:
             output_images.append(self.render_interpolated_image(interpolated_style_parameters, test_image_tensor))
+
+        # Insert style images
+        black_image = torch.zeros([3, 256, 256]).to(_device)
+        grid = []
+        for y in range(grid_dim):
+            for x in range(grid_dim + 2):
+                if x == 0:
+                    if y == 0:
+                        grid.append(style_tensors[0])
+                    elif y == (grid_dim - 1):
+                        grid.append(style_tensors[3])
+                    else:
+                        grid.append(black_image)
+                elif x == grid_dim + 1:
+                    if y == 0:
+                        grid.append(style_tensors[1])
+                    elif y == (grid_dim - 1):
+                        grid.append(style_tensors[2])
+                    else:
+                        grid.append(black_image)
+                else:
+                    grid.append(output_images[(x - 1) + y * grid_dim])
+
         interpolation_dir = '../data/interpolation/'
         if not os.path.exists(interpolation_dir):
             os.makedirs(interpolation_dir)
+
         path = os.path.join(interpolation_dir, run_id + '_four.png')
         print(' Saving to', path)
-        save_tensors_as_grid(output_images, path, nrow=grid_dim)
+        save_tensors_as_grid(grid, path, nrow=grid_dim+2)
         plot_image_tensor(load_image_as_tensor(path, transform=transforms.ToTensor()))
         print(' Done')
 
@@ -132,11 +157,12 @@ class TwoStyleInterpolator(Interpolator):
 
         return interpolated_style_parameters_list
 
-    def produce_interpolated_grid(self, interpolated_style_parameters_list, test_image_tensor, run_id):
+    def produce_interpolated_grid(self, interpolated_style_parameters_list, test_image_tensor, run_id, grid_dim=5):
         print('Rendering images into grid')
         output_images = []
         for interpolated_style_parameters in interpolated_style_parameters_list:
             output_images.append(self.render_interpolated_image(interpolated_style_parameters, test_image_tensor))
+
         interpolation_dir = '../data/interpolation/'
         if not os.path.exists(interpolation_dir):
             os.makedirs(interpolation_dir)
@@ -149,20 +175,26 @@ class TwoStyleInterpolator(Interpolator):
 
 if __name__ == '__main__':
     _device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    _run_id = '0004'
+    _run_id = '0006'
 
     _test_image_tensor = load_image_as_tensor('../data/images/content/venice.jpeg', transform=transform_256)
     _test_image_tensor = _test_image_tensor.unsqueeze(0).to(_device)
 
-    _total_num_styles = 10
+    _total_num_styles = 5
     _network_parameter_path = '../data/networks/model_parameters/' + _run_id
 
     # Two style
-    #_interpolator = TwoStyleInterpolator(_total_num_styles, _network_parameter_path, _device)
-    #_interpolated_style_parameters_list = _interpolator.run_interpolation(6, 9)
-    #_interpolator.produce_interpolated_grid(_interpolated_style_parameters_list, _test_image_tensor, _run_id)
+    _interpolator = TwoStyleInterpolator(_total_num_styles, _network_parameter_path, _device)
+    _interpolated_style_parameters_list = _interpolator.run_interpolation(1, 2)
+    _interpolator.produce_interpolated_grid(_interpolated_style_parameters_list, _test_image_tensor, _run_id)
 
     # Four style
+    style_dir = '../data/images/style/'
+    style_manager = StyleManager(style_dir, _device)
+    style_idxs = [11, 23, 17, 24]
+    network_style_idxs = [1, 2, 3, 4]
+    _style_tensors = style_manager.get_style_tensor_subset(style_idxs)
     _interpolator = FourStyleInterpolator(_total_num_styles, _network_parameter_path, _device)
-    _interpolated_style_parameters_list = _interpolator.run_interpolation(0, 1, 6, 9)
-    _interpolator.produce_interpolated_grid(_interpolated_style_parameters_list, _test_image_tensor, _run_id)
+    _interpolated_style_parameters_list = _interpolator.run_interpolation(*network_style_idxs)
+    _interpolator.produce_interpolated_grid(_style_tensors, _interpolated_style_parameters_list,
+                                            _test_image_tensor, _run_id)
