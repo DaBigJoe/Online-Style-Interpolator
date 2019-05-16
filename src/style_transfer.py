@@ -25,10 +25,10 @@ def train():
     model_dir = '../data/networks/model_parameters'
     test_image_path = '../data/images/content/venice.jpeg'
     batch_size = 4
-    num_parameter_updates = 40000
+    num_parameter_updates = 10000
     content_weight = 1e5
     style_weight = 1e10
-    style_idxs = [0] #[0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
+    style_idxs = [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
     checkpoint_freq = 100
 
     # Ensure save directories exist
