@@ -31,11 +31,11 @@ class TransferNetwork(torch.nn.Module):
         self.norm3 = ConditionalInstanceNorm2d(128, num_styles, affine=True)
 
         # Residual blocks
-        self.res1 = ResidualBlock(num_styles).cuda()
-        self.res2 = ResidualBlock(num_styles).cuda()
-        self.res3 = ResidualBlock(num_styles).cuda()
-        self.res4 = ResidualBlock(num_styles).cuda()
-        self.res5 = ResidualBlock(num_styles).cuda()
+        self.res1 = ResidualBlock(num_styles)
+        self.res2 = ResidualBlock(num_styles)
+        self.res3 = ResidualBlock(num_styles)
+        self.res4 = ResidualBlock(num_styles)
+        self.res5 = ResidualBlock(num_styles)
 
         # Upsampling Layers
         self.ups4 = torch.nn.Upsample(mode='nearest', scale_factor=2)
