@@ -61,25 +61,41 @@ if __name__ == '__main__':
     # Plot
     plt.rcParams['mathtext.fontset'] = 'stix'
     plt.rcParams['font.family'] = 'STIXGeneral'
-    plt.rcParams['font.size'] = 12
-    fig, axis = plt.subplots(1, 1, figsize=(8, 3))
+    plt.rcParams['font.size'] = 16
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     index = np.arange(n)
     bar_width = 0.35
     opacity = 0.5
-    rects1 = axis.bar(index, single_style_losses, bar_width,
-                      alpha=opacity, color='b',
-                      label='Single Style Networks')
 
-    rects2 = axis.bar(index + bar_width, n_style_losses, bar_width,
+    axes[0].bar(index, single_content_losses, bar_width,
+                      alpha=opacity, color='b',
+                      label='Single Style')
+
+    axes[0].bar(index + bar_width, n_content_loss, bar_width,
                       alpha=opacity, color='r',
-                      label='n-Style Network')
-    axis.set_xlabel('Style')
-    axis.set_ylabel('Final Style Loss')
-    axis.set_ylim(0, 600000)
-    axis.set_xticks(index + bar_width / 2)
-    axis.set_xticklabels(('A', 'B', 'C', 'D', 'E'))
-    axis.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
-    axis.legend()
+                      label='n-Style')
+    axes[0].set_xlabel('Style')
+    axes[0].set_ylabel('Final Content Loss')
+    axes[0].set_ylim(0, 1.4e6)
+    axes[0].set_xticks(index + bar_width / 2)
+    axes[0].set_xticklabels(('A', 'B', 'C', 'D', 'E'))
+    axes[0].ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+    axes[0].legend(loc='upper left')
+
+    axes[1].bar(index, single_style_losses, bar_width,
+                      alpha=opacity, color='b',
+                      label='Single Style')
+
+    axes[1].bar(index + bar_width, n_style_losses, bar_width,
+                      alpha=opacity, color='r',
+                      label='n-Style')
+    axes[1].set_xlabel('Style')
+    axes[1].set_ylabel('Final Style Loss')
+    axes[1].set_ylim(0, 6e5)
+    axes[1].set_xticks(index + bar_width / 2)
+    axes[1].set_xticklabels(('A', 'B', 'C', 'D', 'E'))
+    axes[1].ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+    axes[1].legend(loc='upper left')
 
     fig.tight_layout()
     plt.show()
