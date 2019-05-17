@@ -59,10 +59,13 @@ if __name__ == '__main__':
     n_style_losses, n_content_loss = get_final_losses_n_network(n_path, n)
 
     # Plot
-    fig, axis = plt.subplots(1, 1, figsize=(8, 5))
+    plt.rcParams['mathtext.fontset'] = 'stix'
+    plt.rcParams['font.family'] = 'STIXGeneral'
+    plt.rcParams['font.size'] = 12
+    fig, axis = plt.subplots(1, 1, figsize=(8, 3))
     index = np.arange(n)
     bar_width = 0.35
-    opacity = 0.4
+    opacity = 0.5
     rects1 = axis.bar(index, single_style_losses, bar_width,
                       alpha=opacity, color='b',
                       label='Single Style Networks')
