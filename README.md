@@ -1,6 +1,9 @@
 # University of Southampton
 ## COMP6248 Reproducibility Challenge
 ### A Learned Representation For Artistic Style
+
+![Cover Photo](cover.png?raw=true)
+
 Team Name: Deep Fried Learning\
 OpenReview URL of chosen paper: https://openreview.net/forum?id=BJO-BuT1g&noteId=BJO-BuT1g
 
