@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <link rel="stylesheet" href="static/styles.css">
+    <script type="text/javascript" src="static/interpolator.js"></script>
     <meta charset="UTF-8">
     <title>Style Interpolator</title>
 </head>
@@ -19,6 +20,15 @@
     {% for i in range(5) %}
         <div class="image_wrapper">
             <img src="static/images/style_{{ i }}.jpg" alt="Style {{ i }}">
+        </div>
+    {% endfor %}
+    </div>
+
+    <div id="style_sliders">
+    {% for i in range(5) %}
+        <div class="style_slider_wrapper">
+            <input type="range" min="0" max="100" value="0.00" class="style_slider" id="styleSlider{{ i }}">
+            <p id="styleValue{{ i }}" style="text-align: center">0.00</p>
         </div>
     {% endfor %}
     </div>

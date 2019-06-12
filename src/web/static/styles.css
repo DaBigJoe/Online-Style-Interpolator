@@ -27,3 +27,20 @@
     text-align: center;
 	width: 20%;
 }
+
+#style_sliders{
+    display: flex;
+}
+.style_slider_wrapper {
+    display: flex;
+    justify-content: space-around;
+    width: 20%;
+}
+.style_slider {
+    position: relative;
+    left: 2%;
+    width: 80%;
+}
+input[type=range]::-moz-focus-outer {
+    border: 0;
+}
