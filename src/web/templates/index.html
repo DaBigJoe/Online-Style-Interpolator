@@ -28,11 +28,17 @@
     <div id="style_sliders">
     {% for i in range(5) %}
         <div class="style_slider_wrapper">
-            <input type="range" min="0" max="100" value="0.00" class="style_slider" id="styleSlider{{ i }}">
-            <p id="styleValue{{ i }}" style="text-align: center">0.00</p>
+            <input type="range" min="0" max="100" value="50.00" class="style_slider" id="styleSlider{{ i }}">
+            <p id="styleValue{{ i }}" style="text-align: center"></p>
         </div>
     {% endfor %}
     </div>
+
+    <div>
+        <img id="style_output" alt="Style Output">
+    </div>
+
+    <button type="button", id="render_button">Render</button>
 
 </body>
 </html>

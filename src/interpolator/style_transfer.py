@@ -4,10 +4,10 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_manager import Dataset, StyleManager
-from image_handler import normalise_batch, load_image_as_tensor, save_tensor_as_image
-from loss_network import LossNetwork
-from transfer_network import TransferNetwork
+from src.interpolator.data_manager import Dataset, StyleManager
+from src.interpolator.image_handler import normalise_batch, load_image_as_tensor, save_tensor_as_image
+from src.interpolator.loss_network import LossNetwork
+from src.interpolator.transfer_network import TransferNetwork
 
 
 def check_dir(path):

@@ -5,13 +5,12 @@ Author: Alexander Stonard (ads1g15@soton.ac.uk)
 Created: 13/05/19
 """
 
-import numpy as np
-import os
-import torch
 from os import listdir
+
+import torch
 from torch.utils import data
 
-from image_handler import load_image_as_tensor
+from src.interpolator.image_handler import load_image_as_tensor
 
 
 class Dataset(data.Dataset):
