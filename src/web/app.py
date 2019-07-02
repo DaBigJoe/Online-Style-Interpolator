@@ -12,12 +12,14 @@ def index():
 
 @app.route('/interpolate', methods=["POST"])
 def update_interpolation():
-    image_binary = interpolation_handler.interpolate(request.json["values"])
-    return send_file(
-       io.BytesIO(image_binary),
-       mimetype='image/jpeg',
-       as_attachment=True,
-       attachment_filename='interpolated_image.jpeg')
+    image_binary = interpolation_handler.attempt_interpolation(request.json["values"])
+    if image_binary is not None:
+        return send_file(
+           io.BytesIO(image_binary),
+           mimetype='image/jpeg',
+           as_attachment=True,
+           attachment_filename='interpolated_image.jpeg')
+    return ""
 
 
 if __name__ == '__main__':

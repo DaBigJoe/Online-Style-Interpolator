@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
       output.innerHTML = (this.value/100).toFixed(2);
 
       // // Grab all interpolation values and call update method
-      // passSliderValuesForInterpolation(sliders)
+      passSliderValuesForInterpolation(sliders)
     }
   }
 
@@ -36,14 +36,14 @@ document.addEventListener('DOMContentLoaded', function() {
 function updateInterpolation(interpolation_values) {
   let values = {'values': interpolation_values};
   let output_image = document.getElementById("style_output");
-  console.log(output_image);
   $.ajax({
     url: '/interpolate',
     type: 'POST',
     data: JSON.stringify(values),
     contentType: 'application/json',
     success: function (data) {
-        output_image.src = 'data:image/jpeg;base64,' + data;
+        if(data !== "")
+          output_image.src = 'data:image/jpeg;base64,' + data;
     }
     });
 }

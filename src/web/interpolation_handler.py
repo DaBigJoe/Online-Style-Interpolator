@@ -1,6 +1,6 @@
 from src.interpolator.interpolate_styles import NStyleInterpolator
 import torch
-from src.interpolator.image_handler import load_image_as_tensor, transform_256, save_tensor_as_image
+from src.interpolator.image_handler import load_image_as_tensor, transform_256
 from PIL import Image
 import base64
 import io
@@ -19,6 +19,16 @@ class InterpolationHandler:
 
         self.test_image_tensor = load_image_as_tensor('../../data/images/content/venice.jpeg', transform=transform_256)
         self.test_image_tensor = self.test_image_tensor.unsqueeze(0).to(device)
+
+        self.locked = False
+
+    def attempt_interpolation(self, weights):
+        image_binary = None
+        if not self.locked:
+            self.locked = True
+            image_binary = self.interpolate(weights)
+            self.locked = False
+        return image_binary
 
     def interpolate(self, weights):
         interpolated_style_parameters = self.interpolator.interpolate(self.style_idxs, weights)
