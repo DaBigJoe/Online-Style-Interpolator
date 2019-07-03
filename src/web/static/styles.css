@@ -44,3 +44,12 @@
 input[type=range]::-moz-focus-outer {
     border: 0;
 }
+
+#output_images{
+    display: flex;
+}
+.output_image_wrapper {
+    display: flex;
+    justify-content: space-around;
+    width: 33%;
+}
