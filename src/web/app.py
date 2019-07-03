@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, send_file, redirect, url_for
 from src.web.interpolation_handler import InterpolationHandler
+from werkzeug import secure_filename
 import io
+from os.path import join
 
 app = Flask(__name__)
 
@@ -24,7 +26,10 @@ def update_interpolation():
 
 @app.route('/upload', methods=["POST"])
 def upload_image():
-    print('Upload received')
+    f = request.files['file']
+    f_path = join('../../cache', secure_filename(f.filename))
+    f.save(f_path)
+    interpolation_handler.update_image(f_path)
     return redirect(url_for('index'))
 
 

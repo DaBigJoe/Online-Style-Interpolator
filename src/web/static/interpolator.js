@@ -50,13 +50,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let request = new XMLHttpRequest();
     request.onreadystatechange = function() {
       if (request.readyState === XMLHttpRequest.DONE) {
-        alert('Done');
+          passSliderValuesForInterpolation(sliders);
       }
     };
     request.open('POST', "/upload");
     request.send(formData);
-
-
   });
 
   passSliderValuesForInterpolation(sliders);
