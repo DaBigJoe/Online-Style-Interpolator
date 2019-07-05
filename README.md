@@ -4,7 +4,9 @@
 
 ![Cover Photo](cover.png?raw=true)
 
-OpenReview URL of paper: https://openreview.net/forum?id=BJO-BuT1g&noteId=BJO-BuT1g
+OpenReview URL of Original Paper: https://openreview.net/forum?id=BJO-BuT1g&noteId=BJO-BuT1g  
+Medium Article: https://link.medium.com/UzJzB7Ah5X  
+Demo Video: https://youtu.be/h-UpR92l1DI  
 
 ### Team Members
 Joseph Early (je5g15)\
