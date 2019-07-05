@@ -7,9 +7,9 @@
 OpenReview URL of paper: https://openreview.net/forum?id=BJO-BuT1g&noteId=BJO-BuT1g
 
 ### Team Members
-Joseph Early (je5g15, 27309061)\
-Jamie Sian (js17g15, 27775585)\
-Alexander Stonard (ads1g15, 27540774)
+Joseph Early (je5g15)\
+Jamie Sian (js17g15)\
+Alexander Stonard (ads1g15)
 
 ### Overview
 
