@@ -21,6 +21,15 @@ class InterpolationHandler:
 
     def update_image(self, path):
         self.image_tensor = load_image_as_tensor(path, transform=transform_256).unsqueeze(0).to(self.device)
+        t = self.image_tensor.clone()
+        t = t.squeeze(0).detach()
+        t = t.clone().clamp(0, 255).numpy()
+        t = t.transpose(1, 2, 0).astype("uint8")
+        img = Image.fromarray(t, 'RGB')
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG")
+        img_bytes = buffer.getvalue()
+        return base64.b64encode(img_bytes)
 
     def attempt_interpolation(self, weights):
         image_binary = None

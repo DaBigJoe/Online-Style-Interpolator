@@ -29,8 +29,13 @@ def upload_image():
     f = request.files['file']
     f_path = join('../../cache', secure_filename(f.filename))
     f.save(f_path)
-    interpolation_handler.update_image(f_path)
-    return redirect(url_for('index'))
+    image_binary = interpolation_handler.update_image(f_path)
+    return send_file(
+        io.BytesIO(image_binary),
+        mimetype='image/jpeg',
+        as_attachment=True,
+        attachment_filename='interpolated_image.jpeg')
+    #return redirect(url_for('index'))
 
 
 if __name__ == '__main__':

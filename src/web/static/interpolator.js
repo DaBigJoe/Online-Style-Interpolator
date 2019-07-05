@@ -23,11 +23,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  let render_button = document.getElementById("render_button");
-  render_button.onclick = function() {
-    // Grab all interpolation values and call update method
-    passSliderValuesForInterpolation(sliders)
-  };
+  // let render_button = document.getElementById("render_button");
+  // render_button.onclick = function() {
+  //   // Grab all interpolation values and call update method
+  //   passSliderValuesForInterpolation(sliders)
+  // };
 
   let upload_button = document.getElementById("upload_button");
   $(upload_button).change(function () {
@@ -41,16 +41,17 @@ document.addEventListener('DOMContentLoaded', function() {
       formData.set("file", file , file.name);
     }
 
-    let reader = new FileReader();
-    reader.onload = function(e) {
-      $('#content_input').attr('src', e.target.result);
-    };
-    reader.readAsDataURL(upload_button.files[0]);
+    // let reader = new FileReader();
+    // reader.onload = function(e) {
+    //   $('#content_input').attr('src', e.target.result);
+    // };
+    // reader.readAsDataURL(upload_button.files[0]);
 
     let request = new XMLHttpRequest();
     request.onreadystatechange = function() {
       if (request.readyState === XMLHttpRequest.DONE) {
-          passSliderValuesForInterpolation(sliders);
+        $('#content_input').attr('src', 'data:image/jpeg;base64,' + request.responseText);
+        passSliderValuesForInterpolation(sliders);
       }
     };
     request.open('POST', "/upload");
