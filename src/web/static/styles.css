@@ -1,0 +1,55 @@
+#style_images {
+  display: flex;
+}
+
+.image_wrapper {
+	position: relative;
+	width: 20%;
+}
+.image_wrapper:before {
+	content: "";
+	display: block;
+	padding-top: 100%;
+}
+.image_wrapper img {
+    position: absolute;
+    top: 2%;
+    left: 2%;
+    width: 96%;
+    height: 96%;
+}
+
+#style_names {
+  display: flex;
+}
+.style_name {
+	position: relative;
+    text-align: center;
+	width: 20%;
+}
+
+#style_sliders{
+    display: flex;
+}
+.style_slider_wrapper {
+    display: flex;
+    justify-content: space-around;
+    width: 20%;
+}
+.style_slider {
+    position: relative;
+    left: 2%;
+    width: 80%;
+}
+input[type=range]::-moz-focus-outer {
+    border: 0;
+}
+
+#output_images{
+    display: flex;
+    justify-content: space-around;
+}
+.output_image_wrapper {
+    display: flex;
+    width: 30%;
+}

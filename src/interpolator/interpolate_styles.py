@@ -1,12 +1,13 @@
 import torch
 
-from image_handler import load_image_as_tensor, transform_256, save_tensors_as_grid, plot_image_tensor
-from transfer_network import TransferNetwork
+from src.interpolator.image_handler import load_image_as_tensor, transform_256, save_tensors_as_grid, plot_image_tensor
+from src.interpolator.transfer_network import TransferNetwork
 from torchvision import transforms
 import os
 from abc import ABC
 from torch.nn import Softmax
-from data_manager import StyleManager
+from src.interpolator.data_manager import StyleManager
+from copy import deepcopy
 
 class Interpolator(ABC):
 
@@ -14,20 +15,54 @@ class Interpolator(ABC):
         print("Setting up interpolator")
         print(" Using network parameters from", network_parameter_path)
         self.transfer_network = TransferNetwork(total_num_styles)
-        self.transfer_network.load_state_dict(torch.load(network_parameter_path))
+        if device == 'cpu':
+            self.transfer_network.load_state_dict(torch.load(network_parameter_path, map_location='cpu'))
+        else:
+            self.transfer_network.load_state_dict(torch.load(network_parameter_path))
         self.transfer_network.to(device).eval()
         print(" Ready")
 
     def render_interpolated_image(self, interpolated_style_parameters, test_image_tensor, style_idx=0):
+        prev_style_params = deepcopy(self.transfer_network.get_style_parameters(style_idx))
         self.transfer_network.set_style_parameters(interpolated_style_parameters, style_idx)
-        return self.transfer_network(test_image_tensor, style_idx)
+        interpolated_image = self.transfer_network(test_image_tensor, style_idx)
+        self.transfer_network.set_style_parameters(prev_style_params, style_idx)
+        return interpolated_image
+
+
+class NStyleInterpolator(Interpolator):
+
+    def __init__(self, total_num_styles, network_parameter_path, device):
+        super(NStyleInterpolator, self).__init__(total_num_styles, network_parameter_path, device)
+
+    def interpolate(self, style_idxs, alphas):
+        style_parameters_list = []
+        for style_idx in style_idxs:
+            style_parameters_list.append(self.transfer_network.get_style_parameters(style_idx))
+
+        s = sum(alphas)
+        if s != 0:
+            alphas = [float(i)/sum(alphas) for i in alphas]
+
+        num_params = len(style_parameters_list[0][0])
+        interpolated_weights = []
+        interpolated_biases = []
+        for parameter_idx in range(num_params):
+            weights_sum = 0
+            biases_sum = 0
+            for style_idx in range(len(style_parameters_list)):
+                weights, biases = style_parameters_list[style_idx]
+                weights_sum += weights[parameter_idx].mul(alphas[style_idx])
+                biases_sum += biases[parameter_idx].mul(alphas[style_idx])
+            interpolated_weights.append(weights_sum)
+            interpolated_biases.append(biases_sum)
+        return interpolated_weights, interpolated_biases
 
 
 class FourStyleInterpolator(Interpolator):
 
     def __init__(self, total_num_styles, network_parameter_path, device):
         super(FourStyleInterpolator, self).__init__(total_num_styles, network_parameter_path, device)
-        self.softax = Softmax()
 
     def interpolate(self, style_parameters_a, style_parameters_b, style_parameters_c, style_parameters_d, alphas):
         interpolated_weights = []
@@ -36,8 +71,6 @@ class FourStyleInterpolator(Interpolator):
         weights_b, biases_b = style_parameters_b
         weights_c, biases_c = style_parameters_c
         weights_d, biases_d = style_parameters_d
-        #norm_distances = self.softax(torch.tensor(distances))
-        #print(norm_distances)
         for i in range(len(weights_a)):
             weights_sum = weights_a[i].mul(alphas[0]) + \
                           weights_b[i].mul(alphas[1]) + \
@@ -95,7 +128,6 @@ class FourStyleInterpolator(Interpolator):
 
         # Insert style images
         white_image = torch.ones([3, 256, 256]).mul(255).to(_device)
-        print(white_image)
         grid = []
         for y in range(grid_dim):
             for x in range(grid_dim + 2):
@@ -178,11 +210,11 @@ if __name__ == '__main__':
     _device = "cuda:0" if torch.cuda.is_available() else "cpu"
     _run_id = '0006'
 
-    _test_image_tensor = load_image_as_tensor('../data/images/content/venice.jpeg', transform=transform_256)
+    _test_image_tensor = load_image_as_tensor('../../data/images/content/venice.jpeg', transform=transform_256)
     _test_image_tensor = _test_image_tensor.unsqueeze(0).to(_device)
 
     _total_num_styles = 5
-    _network_parameter_path = '../data/networks/model_parameters/' + _run_id
+    _network_parameter_path = '../../data/networks/model_parameters/' + _run_id
 
     # Two style
     _interpolator = TwoStyleInterpolator(_total_num_styles, _network_parameter_path, _device)
@@ -190,7 +222,7 @@ if __name__ == '__main__':
     _interpolator.produce_interpolated_grid(_interpolated_style_parameters_list, _test_image_tensor, _run_id)
 
     # Four style
-    style_dir = '../data/images/style/'
+    style_dir = '../../data/images/style/'
     style_manager = StyleManager(style_dir, _device)
     style_idxs = [11, 23, 17, 24]
     network_style_idxs = [1, 2, 3, 4]

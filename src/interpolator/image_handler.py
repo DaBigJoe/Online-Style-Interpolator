@@ -27,7 +27,8 @@ def load_image_as_tensor(image_path, transform=transform_256):
     Load a single image as a tensor from the given path. Applies a transformation if one is given.
     """
     image = Image.open(image_path)
-    image = transform(image).float()
+    if transform is not None:
+        image = transform(image).float()
     image = Variable(image, requires_grad=False)
 
     # Deal with greyscale

@@ -6,19 +6,14 @@ Author: Joseph Early (je5g15@soton.ac.uk)
 Created: 16/05/19
 """
 
-import torch
-
-from image_handler import load_image_as_tensor, transform_256, save_tensors_as_grid, plot_image_tensor
-from transfer_network import TransferNetwork
-from torchvision import transforms
-import os
-from abc import ABC
-from torch.nn import Softmax
-from data_manager import StyleManager
-from interpolate_styles import TwoStyleInterpolator
-from loss_network import LossNetwork
-from matplotlib import pyplot as plt
 import numpy as np
+import torch
+from src.interpolator.data_manager import StyleManager
+from src.interpolator.interpolate_styles import TwoStyleInterpolator
+from src.interpolator.loss_network import LossNetwork
+from matplotlib import pyplot as plt
+
+from src.interpolator.image_handler import load_image_as_tensor, transform_256
 
 if __name__ == '__main__':
     _device = "cuda:0" if torch.cuda.is_available() else "cpu"

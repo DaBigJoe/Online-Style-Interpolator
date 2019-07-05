@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="static/interpolator.js"></script>
+    <meta charset="UTF-8">
+    <title>Style Interpolator</title>
+</head>
+<body>
+
+<div id="style_names">
+    <p class="style_name">Picasso, <i>Femme nue assise</i> (1910)</p>
+    <p class="style_name">Egon Schiele, <i>Eith wiith Striped Dress</i> (1915)</p>
+    <p class="style_name">Roy Lichtenstein, <i>Bicentennial Print</i> (1975)</p>
+    <p class="style_name">Jamini Roy, <i>Crucifixion</i> (1948)</p>
+    <p class="style_name">Vincent van Gogh, <i>The Starry Night</i> (1889)</p>
+</div>
+
+<div id="style_images">
+    {% for i in range(5) %}
+        <div class="image_wrapper">
+            <img src="static/images/style_{{ i }}.jpg" alt="Style {{ i }}">
+        </div>
+    {% endfor %}
+</div>
+
+<div id="style_sliders">
+    {% for i in range(5) %}
+        <div class="style_slider_wrapper">
+            <input type="range" min="0" max="100" value="50.00" class="style_slider" id="styleSlider{{ i }}">
+            <p id="styleValue{{ i }}" style="text-align: center"></p>
+        </div>
+    {% endfor %}
+</div>
+
+<form enctype="multipart/form-data">
+    <input type="file" id="upload_button"/>
+</form>
+
+<div id="output_images">
+    <img id="content_input" alt="Content Input" class="output_image_wrapper">
+{#    <button type="button" id="render_button" class="output_image_wrapper">Refresh</button>#}
+    <img id="style_output" alt="Style Output" class="output_image_wrapper">
+</div>
+
+</body>
+</html>

@@ -2,9 +2,9 @@ import os
 
 import torch
 
-from data_manager import StyleManager
-from image_handler import load_image_as_tensor, save_tensor_as_image, save_tensors_as_grid
-from transfer_network import TransferNetwork
+from src.interpolator.data_manager import StyleManager
+from src.interpolator.image_handler import load_image_as_tensor, save_tensor_as_image, save_tensors_as_grid
+from src.interpolator.transfer_network import TransferNetwork
 
 
 class Renderer:

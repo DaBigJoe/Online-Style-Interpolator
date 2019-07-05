@@ -16,8 +16,8 @@ from tqdm import tqdm
 import csv
 import torch
 from torch import optim, randn
-from loss_network import LossNetwork
-from image_handler import save_tensor_as_image, plot_image_tensor, load_image_as_tensor, transform_256
+from src.interpolator.loss_network import LossNetwork
+from src.interpolator.image_handler import save_tensor_as_image, plot_image_tensor, load_image_as_tensor, transform_256
 
 
 class StyleLearnerSingle:

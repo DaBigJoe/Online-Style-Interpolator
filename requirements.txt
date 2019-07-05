@@ -1,16 +1,22 @@
 backcall==0.1.0
+Click==7.0
 cycler==0.10.0
 decorator==4.4.0
+Flask==1.0.3
 ipython==7.5.0
 ipython-genutils==0.2.0
+itsdangerous==1.1.0
 jedi==0.13.3
+Jinja2==2.10.1
 kiwisolver==1.0.1
+MarkupSafe==1.1.1
 matplotlib==3.0.3
 numpy==1.16.2
 parso==0.4.0
 pexpect==4.7.0
 pickleshare==0.7.5
 Pillow==6.0.0
+pkg-resources==0.0.0
 prompt-toolkit==2.0.9
 ptyprocess==0.6.0
 Pygments==2.4.0
@@ -23,3 +29,4 @@ torchvision==0.2.2.post3
 tqdm==4.31.1
 traitlets==4.3.2
 wcwidth==0.1.7
+Werkzeug==0.15.4
